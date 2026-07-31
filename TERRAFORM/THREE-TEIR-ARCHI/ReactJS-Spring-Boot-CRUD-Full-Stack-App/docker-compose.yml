@@ -1,0 +1,36 @@
+version: "3.8"
+
+services:
+
+  backend:
+
+    build: ./springboot-backend
+
+    container_name: springboot-backend
+
+    restart: always
+
+    ports:
+      - "8080:8080"
+
+    environment:
+
+      SPRING_DATASOURCE_URL: jdbc:mysql://my-rds.c214w64cecep.us-east-1.rds.amazonaws.com:3306/employee_management_system?useSSL=false
+
+      SPRING_DATASOURCE_USERNAME: admin
+
+      SPRING_DATASOURCE_PASSWORD: Admin12345
+
+  frontend:
+
+    build: ./react-frontend
+
+    container_name: react-frontend
+
+    restart: always
+
+    ports:
+      - "80:80"
+
+    depends_on:
+      - backend
