@@ -69,7 +69,7 @@ Install the following:
 # Clone Repository
 
 ```bash
-git clone 
+git clone https://github.com/achalpadol/ReactJS-Spring-Boot-CRUD-Full-Stack-App.git
 
 cd ReactJS-Spring-Boot-CRUD-Full-Stack-App
 ```
@@ -431,7 +431,7 @@ nc -zv <RDS-ENDPOINT> 3306
 ## Test MySQL Connection
 
 ```bash
-mysql -h <RDS-ENDPOINT> \
+mysql -h my-rds.c214w64cecep.us-east-1.rds.amazonaws.com \
 -u admin \
 -p
 ```
@@ -464,17 +464,7 @@ mysql -h <RDS-ENDPOINT> \
 
 # Application URLs
 
-Frontend
-
-```
-http://<EC2-Public-IP>
-```
-
-Backend API
-
-```
-http://<EC2-Public-IP>:8080/api/v1/employees
-```
+ALB URL - http://my-alb-1912724132.us-east-1.elb.amazonaws.com/employees
 
 ---
 
