@@ -464,7 +464,7 @@ mysql -h my-rds.c214w64cecep.us-east-1.rds.amazonaws.com \
 
 # Application URLs
 
-ALB URL - http://my-alb-1912724132.us-east-1.elb.amazonaws.com/employees
+ALB URL - http://my-alb-1912724132.us-east-1.elb.amazonaws.com/
 
 ---
 
