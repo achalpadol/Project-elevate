@@ -466,7 +466,13 @@ mysql -h my-rds.c214w64cecep.us-east-1.rds.amazonaws.com \
 
 ALB URL - http://my-alb-1912724132.us-east-1.elb.amazonaws.com/
 
----
+# Output
+Add Employee information
+<img width="1905" height="772" alt="Screenshot 2026-07-31 101038" src="https://github.com/user-attachments/assets/69120f9b-d2b9-480d-93b1-d4abb08d460a" />
+Data Successfully added into the database
+<img width="1920" height="1080" alt="Screenshot (67)" src="https://github.com/user-attachments/assets/d1c89233-2c55-44d4-ac14-3013fc5fa35c" />
+View added Information
+<img width="1783" height="777" alt="Screenshot 2026-07-31 112453" src="https://github.com/user-attachments/assets/8dbc08d8-95ac-4256-8694-5ea810e66ab6" />
 
 # Deployment Flow
 
