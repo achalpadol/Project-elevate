@@ -69,7 +69,7 @@ Install the following:
 # Clone Repository
 
 ```bash
-git clone <repository-url>
+git clone 
 
 cd ReactJS-Spring-Boot-CRUD-Full-Stack-App
 ```
@@ -91,7 +91,7 @@ employee_management_system
 Connect to RDS
 
 ```bash
-mysql -h <RDS-ENDPOINT> \
+mysql -h my-rds.c214w64cecep.us-east-1.rds.amazonaws.com \
 -u admin \
 -p
 ```
