@@ -1,16 +1,16 @@
 # 1. AWS Provider Configuration
 provider "aws" {
-  region = "us-east-1"
+  region = var.region_name
 }
 
 # 2. Virtual Private Cloud (VPC)
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
-  enable_dns_support   = true
-  enable_dns_hostnames = true
+  enable_dns_support   = var.enable_dns_support
+  enable_dns_hostnames = var.enable_dns_hostnames
 
   tags = {
-    Name = "main-vpc"
+    Name = var.vpc_name
   }
 }
 
@@ -19,7 +19,7 @@ resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "main-igw"
+    Name = var.igw_name
   }
 }
 
@@ -28,12 +28,12 @@ resource "aws_internet_gateway" "igw" {
 # ==========================================
 
 resource "aws_subnet" "public" {
-  count = 2
+  count = length(var.public_subnet_cidrs)
 
   vpc_id                  = aws_vpc.main.id
   cidr_block              = var.public_subnet_cidrs[count.index]
   availability_zone       = var.public_subnet_azs[count.index]
-  map_public_ip_on_launch = true
+  map_public_ip_on_launch = var.map_public_ip_on_launch
 
   tags = {
     Name = var.public_subnet_names[count.index]
@@ -42,7 +42,7 @@ resource "aws_subnet" "public" {
 
 # 5. Private Subnets (Application Tier)
 resource "aws_subnet" "private_app" {
-  count = 2
+    count = length(var.private_app_subnet_cidrs)
 
   vpc_id            = aws_vpc.main.id
   cidr_block        = var.private_app_subnet_cidrs[count.index]
@@ -54,7 +54,7 @@ resource "aws_subnet" "private_app" {
 }
 # 6. Private Subnets (Database Tier)
 resource "aws_subnet" "private_db" {
-  count = 2
+  count = length(var.private_db_subnet_cidrs)
 
   vpc_id            = aws_vpc.main.id
   cidr_block        = var.private_db_subnet_cidrs[count.index]
@@ -74,7 +74,7 @@ resource "aws_eip" "nat" {
   depends_on = [aws_internet_gateway.igw]
 
   tags = {
-    Name = "my-ei"
+    Name = var.my_elasti_ip
   }
 }
 
@@ -84,7 +84,7 @@ resource "aws_nat_gateway" "nat" {
   subnet_id = aws_subnet.public[0].id
 
   tags = {
-    Name = "my-nat"
+    Name = var.my_nat_gateway"
   }
 
   depends_on = [aws_internet_gateway.igw]
@@ -99,12 +99,12 @@ resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
   route {
-    cidr_block = "0.0.0.0/0"
+    cidr_block =  var.public_route_cidr
     gateway_id = aws_internet_gateway.igw.id
   }
 
   tags = {
-    Name = "public-rt"
+    Name = var.public_route_table_name
   }
 }
 
@@ -121,17 +121,15 @@ resource "aws_route_table_association" "public" {
 
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.main.id
-
   route {
-    cidr_block     = "0.0.0.0/0"
+    cidr_block = var.private_route_cidr
     nat_gateway_id = aws_nat_gateway.nat.id
   }
 
   tags = {
-    Name = "private-rt"
+    Name = var.private_route_table_name
   }
 }
-
 # App Subnets Association
 resource "aws_route_table_association" "app" {
   count = length(aws_subnet.private_app)
