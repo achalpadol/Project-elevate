@@ -22,9 +22,7 @@ variable "igw_name"{
   type = string
 }
 
-#############################
 # Public Subnets
-#############################
 
 variable "public_subnet_cidrs" {
   description = "Public subnet CIDRs"
@@ -44,9 +42,8 @@ variable "map_public_ip_on_launch" {
   description = "Assign public IP automatically"
   type = bool
 }
-#############################
+
 # Private App Subnets
-#############################
 
 variable "private_app_subnet_cidrs" {
   description = "Application subnet CIDRs"
@@ -63,9 +60,7 @@ variable "private_app_subnet_names" {
   type        = list(string)
 }
 
-#############################
 # Private DB Subnets
-#############################
 
 variable "private_db_subnet_cidrs" {
   description = "Database subnet CIDRs"
@@ -315,17 +310,14 @@ variable "public_key_path" {
 
 variable "iam_role_name" {
   type = string
-
 }
 
 variable "instance_profile_name" {
   type = string
-
 }
 
 variable "ssm_policy_arn" {
   type = string
-
 }
 
 
