@@ -1,4 +1,7 @@
 # 1. AWS Provider Configuration
+terraform {
+  backend "s3" {}
+}
 provider "aws" {
   region = var.REGION_NAME
 }
