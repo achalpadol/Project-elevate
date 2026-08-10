@@ -1035,5 +1035,9 @@ yes
               |     :3306      |
               +----------------+
 ```
+Output
+<img width="1920" height="1080" alt="Screenshot (69)" src="https://github.com/user-attachments/assets/b5c632da-55b4-42cb-b451-833a7bdcfea4" />
+
+<img width="1919" height="1075" alt="Screenshot 2026-08-09 231025" src="https://github.com/user-attachments/assets/263ff58f-ed34-46ae-8deb-f4f18b25c72b" />
 
 The application can therefore be accessed through **one ALB DNS**, while Nginx internally routes API requests to the Spring Boot container and Spring Boot communicates with the private RDS database.
