@@ -33,7 +33,7 @@ This project is a full-stack Employee Management application deployed on AWS usi
                     +-------+-------+
                             |
                             |
-                  Public Subnets
+                  Private Subnets
                             |
                             |
                  +----------+----------+
