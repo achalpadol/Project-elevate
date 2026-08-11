@@ -1,23 +1,30 @@
-# Employee Management Application – AWS ECS Deployment
+# AWS Three-Tier Architecture – Terraform
 
 ## 📌 Project Overview
 
-This project is a full-stack Employee Management application deployed on AWS using a three-tier architecture.
+This project provisions a **three-tier architecture on AWS using Terraform**.
 
-### Application Stack
+The architecture separates the infrastructure into three logical layers:
 
-* **Frontend:** React.js
-* **Web Server:** Nginx
-* **Backend:** Spring Boot
-* **Database:** MySQL
-* **Containerization:** Docker
-* **Container Registry:** Amazon ECR Public
-* **Container Platform:** Amazon ECS Fargate
-* **Load Balancer:** Application Load Balancer (ALB)
-* **Database Service:** Amazon RDS for MySQL
-* **Networking:** Amazon VPC
-* **Logging:** Amazon CloudWatch Logs
-* **Infrastructure as Code:** Terraform
+* **Web Tier** – Public subnets for internet-facing resources such as an Application Load Balancer.
+* **Application Tier** – Private subnets for application servers such as EC2 instances.
+* **Database Tier** – Private subnets for Amazon RDS MySQL.
+
+The infrastructure is designed using AWS networking and security best practices, with controlled communication between each tier.
+
+### AWS Services Used
+
+* **Amazon VPC** – Network isolation
+* **Amazon EC2** – Application servers
+* **Application Load Balancer (ALB)** – Distributes incoming traffic
+* **Amazon RDS for MySQL** – Database layer
+* **Internet Gateway** – Internet connectivity for public subnets
+* **NAT Gateway** – Outbound internet access for private subnets
+* **Route Tables** – Network traffic routing
+* **Security Groups** – Instance-level traffic control
+* **Elastic IP** – Static public IP for NAT Gateway
+* **Terraform** – Infrastructure as Code
+* **IAM** – AWS permissions and roles
 
 ---
 
@@ -26,43 +33,38 @@ This project is a full-stack Employee Management application deployed on AWS usi
 ```text
                          Internet
                             |
-                            |
-                    +---------------+
-                    |      ALB      |
-                    | Port 80 / 443 |
-                    +-------+-------+
-                            |
-                            |
-                  Public Subnets
-                            |
-                            |
-                 +----------+----------+
-                 |                     |
-                 |    ECS Fargate      |
-                 |                     |
-                 |  +---------------+  |
-                 |  | React + Nginx |  |
-                 |  |   Port 80     |  |
-                 |  +-------+-------+  |
-                 |          |          |
-                 |          | /api     |
-                 |          v          |
-                 |  +---------------+  |
-                 |  | Spring Boot   |  |
-                 |  |   Port 8080   |  |
-                 |  +-------+-------+  |
-                 |          |          |
-                 +----------|----------+
-                            |
-                            |
-                     Private Subnets
-                            |
                             v
-                    +---------------+
-                    |  Amazon RDS   |
-                    |     MySQL     |
-                    |    Port 3306  |
-                    +---------------+
+                  +-------------------+
+                  |       ALB         |
+                  |    Port 80/443    |
+                  +---------+---------+
+                            |
+                            |
+                  ┌─────────┴─────────┐
+                  |    WEB TIER       |
+                  |   Public Subnets  |
+                  |                   |
+                  |  ALB / Web Layer  |
+                  └─────────┬─────────┘
+                            |
+                            | HTTP
+                            v
+                  ┌───────────────────┐
+                  |   APP TIER        |
+                  |  Private Subnets  |
+                  |                   |
+                  |  EC2 Instances    |
+                  |  Application      |
+                  └─────────┬─────────┘
+                            |
+                            | MySQL :3306
+                            v
+                  ┌───────────────────┐
+                  |   DATABASE TIER   |
+                  |  Private Subnets  |
+                  |                   |
+                  |    RDS MySQL      |
+                  └───────────────────┘
 ```
 
 ---
@@ -70,53 +72,57 @@ This project is a full-stack Employee Management application deployed on AWS usi
 # 📁 Project Structure
 
 ```text
-ReactJS-Spring-Boot-CRUD-Full-Stack-App/
+THREE-TEIR-ARCHI/
 │
-├── react-frontend/
-│   ├── src/
-│   ├── public/
-│   ├── package.json
-│   ├── Dockerfile
-│   └── nginx.conf
+├── main.tf
+├── variable.tf
+├── output.tf
+├── terraform.tfvars
 │
-├── springboot-backend/
-│   ├── src/
-│   ├── pom.xml
-│   ├── Dockerfile
-│   └── src/main/resources/
-│       └── application.properties
-│
-└── TERRAFORM/
-    └── THREE-TEIR-ARCHI/
+└── modules/
+    │
+    ├── VPC/
+    │   ├── main.tf
+    │   ├── variable.tf
+    │   └── output.tf
+    │
+    ├── SG/
+    │   ├── main.tf
+    │   ├── variable.tf
+    │   └── output.tf
+    │
+    ├── ALB/
+    │   ├── main.tf
+    │   ├── variable.tf
+    │   └── output.tf
+    │
+    ├── EC2/
+    │   ├── main.tf
+    │   ├── variable.tf
+    │   └── output.tf
+    │
+    ├── RDS/
+    │   ├── main.tf
+    │   ├── variable.tf
+    │   └── output.tf
+    │
+    └── IAM/
         ├── main.tf
         ├── variable.tf
-        ├── output.tf
-        ├── terraform.tfvars
-        │
-        └── modules/
-            ├── VPC/
-            ├── SG/
-            ├── RDS/
-            ├── ALB/
-            ├── EC2/
-            ├── IAM/
-            ├── ECS-CLUSTER/
-            ├── TASK-DEFINITION/
-            └── ECS-SERVICE/
+        └── output.tf
 ```
 
 ---
 
 # 1. Prerequisites
 
-Install/configure:
+Install and configure:
 
 * AWS CLI
-* Docker
 * Terraform
 * Git
 * AWS account
-* IAM permissions for required AWS resources
+* Appropriate IAM permissions
 
 Configure AWS CLI:
 
@@ -124,7 +130,7 @@ Configure AWS CLI:
 aws configure
 ```
 
-Verify:
+Verify the AWS identity:
 
 ```bash
 aws sts get-caller-identity
@@ -132,526 +138,700 @@ aws sts get-caller-identity
 
 ---
 
-# 2. Application Configuration
+# 2. Terraform Provider
 
-## Backend Database Configuration
-
-Update the Spring Boot `application.properties` file.
+The AWS provider is configured to deploy resources into the selected AWS region.
 
 Example:
 
-```properties
-spring.datasource.url=jdbc:mysql://RDS-ENDPOINT:3306/mydatabase
-spring.datasource.username=admin
-spring.datasource.password=YOUR_PASSWORD
-
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
-
-server.port=8080
-```
-
-Replace:
-
-```text
-RDS-ENDPOINT
-YOUR_PASSWORD
-```
-
-with your actual RDS values.
-
----
-
-# 3. Build the Spring Boot JAR
-
-Navigate to the backend directory:
-
-```bash
-cd springboot-backend
-```
-
-Build the application:
-
-```bash
-mvn clean package
-```
-
-The JAR will be generated inside:
-
-```text
-target/
-```
-
-Example:
-
-```text
-target/app.jar
-```
-
----
-
-# 4. Backend Docker Image
-
-Example backend Dockerfile:
-
-```dockerfile
-FROM eclipse-temurin:17-jdk
-
-WORKDIR /app
-
-COPY target/*.jar app.jar
-
-EXPOSE 8080
-
-ENTRYPOINT ["java", "-jar", "app.jar"]
-```
-
-Build:
-
-```bash
-docker build -t backend:latest .
-```
-
-Test:
-
-```bash
-docker images
-```
-
----
-
-# 5. Frontend Docker Image
-
-The React application is served using Nginx.
-
-Example Dockerfile:
-
-```dockerfile
-FROM node:16 AS build
-
-WORKDIR /app
-
-COPY package*.json ./
-
-RUN npm install
-
-COPY . .
-
-RUN npm run build
-
-
-FROM nginx:alpine
-
-COPY --from=build /app/build /usr/share/nginx/html
-
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-> If your React project generates `dist` instead of `build`, use `/app/dist`.
-
----
-
-# 6. Nginx Configuration
-
-Because the frontend and backend containers run inside the **same ECS task**, Nginx forwards `/api` requests to the backend container through localhost.
-
-```nginx
-server {
-    listen 80;
-
-    server_name localhost;
-
-    root /usr/share/nginx/html;
-
-    index index.html;
-
-    location / {
-        try_files $uri /index.html;
-    }
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:8080/api/;
-
-        proxy_http_version 1.1;
-
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+```hcl
+provider "aws" {
+  region = var.region_name
 }
 ```
 
-The browser sends:
+Example variable:
 
-```text
-http://ALB-DNS/api/employees
-```
-
-Nginx forwards it internally:
-
-```text
-127.0.0.1:8080/api/employees
+```hcl
+region_name = "us-east-1"
 ```
 
 ---
 
-# 7. Build Frontend Image
+# 3. VPC
 
-Navigate to the frontend:
-
-```bash
-cd react-frontend
-```
-
-Build:
-
-```bash
-docker build -t frontend:latest .
-```
-
-Verify:
-
-```bash
-docker images
-```
-
----
-
-# 8. Amazon ECR
-
-This project uses Amazon ECR Public.
-
-Login:
-
-```bash
-aws ecr-public get-login-password --region us-east-1 | \
-docker login --username AWS --password-stdin public.ecr.aws
-```
-
----
-
-# 9. Tag Backend Image
+The project creates a dedicated VPC.
 
 Example:
 
-```bash
-docker tag backend:latest \
-public.ecr.aws/v4c7w1f2/full-stack-repo:backend-v1
+```text
+VPC
+CIDR: 10.0.0.0/16
 ```
 
-Push:
+The VPC contains three logical tiers.
 
-```bash
-docker push \
-public.ecr.aws/v4c7w1f2/full-stack-repo:backend-v1
+```text
+                    VPC
+               10.0.0.0/16
+                     |
+        +------------+------------+
+        |            |            |
+        v            v            v
+     Web Tier     App Tier     DB Tier
+     Public       Private      Private
 ```
 
 ---
 
-# 10. Tag Frontend Image
+# 4. Subnet Architecture
 
-Use only one `:` before the tag.
-
-Correct:
-
-```bash
-docker tag frontend:latest \
-public.ecr.aws/v4c7w1f2/full-stack-repo:frontend-v1
-```
-
-Push:
-
-```bash
-docker push \
-public.ecr.aws/v4c7w1f2/full-stack-repo:frontend-v1
-```
-
-Incorrect:
-
-```text
-full-stack-repo:frontend:v1
-```
-
-Correct:
-
-```text
-full-stack-repo:frontend-v1
-```
-
----
-
-# 11. Amazon VPC
-
-The Terraform configuration creates:
+The VPC contains multiple subnets distributed across Availability Zones.
 
 ```text
 VPC
 │
 ├── Public Subnet 1
+│   └── us-east-1a
+│
 ├── Public Subnet 2
+│   └── us-east-1b
 │
 ├── Private App Subnet 1
+│   └── us-east-1a
+│
 ├── Private App Subnet 2
+│   └── us-east-1b
 │
 ├── Private DB Subnet 1
+│   └── us-east-1a
+│
 └── Private DB Subnet 2
+    └── us-east-1b
 ```
 
-Additional components:
+### Example CIDRs
 
 ```text
+VPC
+10.0.0.0/16
+
+Public Subnets
+10.0.1.0/24
+10.0.2.0/24
+
+Private Application Subnets
+10.0.3.0/24
+10.0.4.0/24
+
+Private Database Subnets
+10.0.5.0/24
+10.0.6.0/24
+```
+
+Using multiple Availability Zones provides better availability and fault tolerance.
+
+---
+
+# 5. Internet Gateway
+
+The Internet Gateway provides internet connectivity to resources in the public subnets.
+
+```text
+Internet
+    |
+    v
 Internet Gateway
+    |
+    v
+Public Subnets
+```
+
+The public route table contains:
+
+```text
+Destination: 0.0.0.0/0
+Target: Internet Gateway
+```
+
+This allows public resources such as the ALB to receive internet traffic.
+
+---
+
+# 6. NAT Gateway
+
+The NAT Gateway is deployed in a public subnet.
+
+Private application instances can use the NAT Gateway for outbound internet access without becoming directly accessible from the internet.
+
+```text
+Private App Subnet
+        |
+        v
+Private Route Table
+        |
+        v
 NAT Gateway
-Public Route Tables
-Private Route Tables
+        |
+        v
+Internet Gateway
+        |
+        v
+Internet
+```
+
+The NAT Gateway uses an Elastic IP address.
+
+---
+
+# 7. Route Tables
+
+The architecture uses separate route tables for public and private subnets.
+
+## Public Route Table
+
+```text
+Destination       Target
+
+10.0.0.0/16       local
+0.0.0.0/0         Internet Gateway
+```
+
+Associated with:
+
+```text
+Public Subnet 1
+Public Subnet 2
+```
+
+## Private Application Route Table
+
+```text
+Destination       Target
+
+10.0.0.0/16       local
+0.0.0.0/0         NAT Gateway
+```
+
+Associated with:
+
+```text
+Private App Subnet 1
+Private App Subnet 2
+```
+
+## Database Route Table
+
+The database tier remains private and does not require direct internet access.
+
+```text
+Destination       Target
+
+10.0.0.0/16       local
+```
+
+Associated with:
+
+```text
+Private DB Subnet 1
+Private DB Subnet 2
 ```
 
 ---
 
-# 12. Security Groups
+# 8. Security Groups
 
-Three security groups are used.
-
-## ALB Security Group
-
-Allows:
+Three security groups are created for the three tiers.
 
 ```text
-HTTP  → 80
-HTTPS → 443
+                 Internet
+                    |
+                    v
+              +----------+
+              | ALB-SG   |
+              +----+-----+
+                   |
+                   v
+              +----------+
+              | APP-SG   |
+              +----+-----+
+                   |
+                   v
+              +----------+
+              |  DB-SG   |
+              +----------+
 ```
-
-from:
-
-```text
-0.0.0.0/0
-```
-
-## Application Security Group
-
-Allows application traffic from the ALB.
-
-```text
-Port 80
-```
-
-## Database Security Group
-
-Allows MySQL traffic:
-
-```text
-Port 3306
-```
-
-only from the application layer.
 
 ---
 
-# 13. Amazon RDS
+# 9. ALB Security Group
 
-Create a MySQL RDS instance in the private DB subnets.
+The ALB security group allows public HTTP/HTTPS traffic.
 
-Example configuration:
+Example:
 
-```hcl
-DB_SUBNET_GROUP_NAME = "my-db-subnet-group"
+```text
+Inbound:
 
-DB_IDENTIFIER = "my-rds"
+HTTP   : 80
+Source : 0.0.0.0/0
 
-ENGINE = "mysql"
-
-ENGINE_VERSION = "8.0"
-
-INSTANCE_CLASS = "db.t3.micro"
-
-ALLOCATED_STORAGE = 20
-
-STORAGE_TYPE = "gp2"
-
-DB_NAME = "mydatabase"
-
-USERNAME = "admin"
-
-PASSWORD = "YOUR_PASSWORD"
-
-PUBLICLY_ACCESSIBLE = false
-
-SKIP_FINAL_SNAPSHOT = true
+HTTPS  : 443
+Source : 0.0.0.0/0
 ```
 
-After deployment, get the RDS endpoint:
+Outbound traffic can be allowed to the application layer.
 
-```bash
-aws rds describe-db-instances \
-  --db-instance-identifier my-rds
+```text
+Outbound:
+
+Protocol : All
+Destination : 0.0.0.0/0
 ```
-
-Use the endpoint in the Spring Boot configuration.
 
 ---
 
-# 14. Application Load Balancer
+# 10. Application Security Group
 
-The ALB is deployed in the public subnets.
+The application security group is attached to the EC2 instances.
 
-Traffic flow:
+Instead of allowing traffic from the entire internet, application traffic is allowed only from the ALB security group.
+
+Example:
+
+```text
+Inbound:
+
+Port     : 80
+Protocol : TCP
+Source   : ALB Security Group
+```
+
+This creates controlled communication:
 
 ```text
 Internet
    |
    v
-ALB :80
+ALB
    |
+   | Port 80
    v
-ECS Fargate Task :80
-   |
-   v
-Nginx
-   |
-   v
-Spring Boot :8080
+EC2
 ```
 
-The ALB target group must use:
-
-```text
-target_type = "ip"
-```
-
-because ECS Fargate with:
-
-```text
-network_mode = "awsvpc"
-```
-
-uses ENI/IP-based networking.
-
-Do **not** use:
-
-```text
-target_type = "instance"
-```
-
-for this Fargate configuration.
+The EC2 instances are not directly exposed to the internet.
 
 ---
 
-# 15. ECS Cluster
+# 11. Database Security Group
 
-Terraform creates the ECS cluster.
+The database security group allows MySQL traffic only from the application security group.
+
+```text
+Inbound:
+
+Port     : 3306
+Protocol : TCP
+Source   : Application Security Group
+```
+
+Therefore:
+
+```text
+Internet
+    X
+    |
+    X
+   RDS
+
+EC2
+ |
+ | 3306
+ v
+RDS
+```
+
+The database cannot be accessed directly from the internet.
+
+---
+
+# 12. Application Load Balancer
+
+The Application Load Balancer is deployed into the public subnets.
+
+```text
+Internet
+    |
+    v
++-------------+
+|     ALB     |
+|   Port 80   |
++------+------+
+       |
+       v
+Target Group
+       |
+       v
+EC2 Instances
+```
+
+The ALB provides:
+
+* Public access
+* Traffic distribution
+* Health checks
+* High availability across Availability Zones
+
+---
+
+# 13. ALB Target Group
+
+The target group contains the application EC2 instances.
 
 Example:
 
-```hcl
-CLUSTER_NAME       = "employee-management-cluster"
-CONTAINER_INSIGHTS = "enabled"
+```text
+Target Type: instance
+Protocol: HTTP
+Port: 80
 ```
+
+The ALB forwards incoming requests to healthy EC2 instances.
+
+```text
+Client
+  |
+  v
+ALB
+  |
+  +-------> EC2-1
+  |
+  +-------> EC2-2
+```
+
+If one instance becomes unhealthy, the ALB can stop sending traffic to that instance.
 
 ---
 
-# 16. ECS Task Definition
+# 14. EC2 Application Tier
 
-The task definition contains two containers:
+The application servers are deployed in private application subnets.
 
 ```text
-ECS Task
+Private App Subnet 1
+        |
+        +---- EC2-1
+        |
+        +---- Application
+
+
+Private App Subnet 2
+        |
+        +---- EC2-2
+        |
+        +---- Application
+```
+
+The EC2 instances do not require public IP addresses.
+
+Traffic reaches them through the ALB.
+
+---
+
+# 15. Amazon RDS MySQL
+
+Amazon RDS provides the database layer.
+
+The RDS instance is deployed into private database subnets.
+
+```text
+Private DB Subnet 1
+        |
+        +---- RDS
+
+
+Private DB Subnet 2
+        |
+        +---- RDS Subnet Group
+```
+
+Example configuration:
+
+```hcl
+engine                  = "mysql"
+engine_version          = "8.0"
+instance_class          = "db.t3.micro"
+allocated_storage       = 20
+storage_type            = "gp2"
+db_name                 = "mydatabase"
+username                = "admin"
+publicly_accessible     = false
+skip_final_snapshot     = true
+```
+
+The RDS instance is not publicly accessible.
+
+---
+
+# 16. RDS Subnet Group
+
+The RDS subnet group contains private database subnets.
+
+Example:
+
+```text
+RDS Subnet Group
 │
-├── Frontend
-│   ├── React
-│   ├── Nginx
-│   └── Port 80
+├── Private DB Subnet 1
+│   └── us-east-1a
 │
-└── Backend
-    ├── Spring Boot
-    └── Port 8080
+└── Private DB Subnet 2
+    └── us-east-1b
 ```
+
+This allows RDS to use multiple Availability Zones.
+
+---
+
+# 17. Three-Tier Traffic Flow
+
+The complete traffic flow is:
+
+```text
+                    INTERNET
+                       |
+                       | HTTP/HTTPS
+                       v
+              +----------------+
+              |      ALB       |
+              |  Public Subnet |
+              +-------+--------+
+                      |
+                      | HTTP
+                      v
+              +----------------+
+              |      EC2       |
+              |  Private App   |
+              |     Subnet     |
+              +-------+--------+
+                      |
+                      | MySQL :3306
+                      v
+              +----------------+
+              |      RDS       |
+              |     MySQL      |
+              |  Private DB    |
+              |     Subnet     |
+              +----------------+
+```
+
+---
+
+# 18. Terraform Modules
+
+The project is organized using reusable Terraform modules.
+
+```text
+Root Module
+    |
+    +---- VPC Module
+    |
+    +---- Security Group Module
+    |
+    +---- ALB Module
+    |
+    +---- EC2 Module
+    |
+    +---- RDS Module
+    |
+    +---- IAM Module
+```
+
+This makes the infrastructure easier to maintain and reuse.
+
+---
+
+# 19. VPC Module
+
+The VPC module is responsible for:
+
+* VPC
+* Public subnets
+* Private application subnets
+* Private database subnets
+* Internet Gateway
+* NAT Gateway
+* Elastic IP
+* Public route tables
+* Private route tables
+* Route table associations
 
 Example:
 
 ```hcl
-TASK_FAMILY = "employee-management"
+module "vpc" {
+  source = "./modules/VPC"
 
-TASK_CPU = 512
+  vpc_cidr = var.vpc_cidr
 
-TASK_MEMORY = 1024
+  public_subnet_cidrs  = var.public_subnet_cidrs
+  private_subnet_cidrs = var.private_subnet_cidrs
+  db_subnet_cidrs      = var.db_subnet_cidrs
 
-FRONTEND_CONTAINER_NAME = "frontend"
-
-FRONTEND_IMAGE = "public.ecr.aws/v4c7w1f2/full-stack-repo:frontend-v1"
-
-FRONTEND_CONTAINER_PORT = 80
-
-BACKEND_CONTAINER_NAME = "backend"
-
-BACKEND_IMAGE = "public.ecr.aws/v4c7w1f2/full-stack-repo:backend-v1"
-
-BACKEND_CONTAINER_PORT = 8080
-
-LOG_GROUP_NAME = "/ecs/employee-cluster"
+  azs = var.azs
+}
 ```
 
 ---
 
-# 17. CloudWatch Logs
+# 20. Security Group Module
 
-Create a CloudWatch log group:
-
-```text
-/ecs/employee-cluster
-```
-
-Frontend logs:
+The Security Group module creates security groups for:
 
 ```text
-frontend
+ALB
+Application
+Database
 ```
 
-Backend logs:
+Communication is restricted to the required layers.
 
 ```text
-backend
+Internet
+   |
+   v
+ALB-SG
+   |
+   v
+APP-SG
+   |
+   v
+DB-SG
 ```
-
-The ECS task execution role must have permission to write logs to CloudWatch.
 
 ---
 
-# 18. ECS Service
+# 21. ALB Module
 
-The ECS service maintains the desired number of running tasks.
+The ALB module creates:
+
+* Application Load Balancer
+* Target Group
+* Listener
+* Target Group attachments
 
 Example:
 
-```hcl
-SERVICE_NAME = "employee-management-service"
-
-DESIRED_COUNT = 1
-```
-
-The ECS service uses:
-
 ```text
-ECS Cluster
-      |
-      v
-Task Definition
-      |
-      v
-Fargate Task
-      |
-      +---- Frontend :80
-      |
-      +---- Backend :8080
+ALB
+ |
+ +---- Listener :80
+ |
+ +---- Target Group
+          |
+          +---- EC2
+          |
+          +---- EC2
 ```
 
 ---
 
-# 19. Terraform Deployment
+# 22. EC2 Module
+
+The EC2 module creates the application instances.
+
+Example resources:
+
+```text
+aws_instance
+```
+
+The instances are placed in private application subnets.
+
+The ALB forwards application traffic to these instances.
+
+---
+
+# 23. RDS Module
+
+The RDS module creates:
+
+* RDS subnet group
+* RDS MySQL instance
+* Database configuration
+* Database security group association
+
+The database remains private.
+
+```text
+Application EC2
+      |
+      | 3306
+      v
+RDS MySQL
+```
+
+---
+
+# 24. IAM Module
+
+IAM resources can be created to provide AWS permissions to EC2 or other AWS resources when required.
+
+For example:
+
+```text
+IAM Role
+   |
+   v
+IAM Policy
+   |
+   v
+EC2 Instance Profile
+```
+
+Only the required permissions should be granted.
+
+---
+
+# 25. Terraform Variables
+
+Example `terraform.tfvars`:
+
+```hcl
+region_name = "us-east-1"
+
+vpc_cidr = "10.0.0.0/16"
+
+enable_dns_support   = true
+enable_dns_hostnames = true
+
+vpc_name = "three-tier-vpc"
+
+public_subnet_cidrs = [
+  "10.0.1.0/24",
+  "10.0.2.0/24"
+]
+
+private_subnet_cidrs = [
+  "10.0.3.0/24",
+  "10.0.4.0/24"
+]
+
+db_subnet_cidrs = [
+  "10.0.5.0/24",
+  "10.0.6.0/24"
+]
+
+azs = [
+  "us-east-1a",
+  "us-east-1b"
+]
+```
+
+---
+
+# 26. Terraform Deployment
 
 Navigate to the Terraform root directory:
 
@@ -665,25 +845,25 @@ Initialize Terraform:
 terraform init
 ```
 
-Validate:
+Validate the configuration:
 
 ```bash
 terraform validate
 ```
 
-Format:
+Format Terraform files:
 
 ```bash
 terraform fmt -recursive
 ```
 
-Review:
+Create an execution plan:
 
 ```bash
 terraform plan
 ```
 
-Deploy:
+Deploy the infrastructure:
 
 ```bash
 terraform apply
@@ -695,59 +875,35 @@ Enter:
 yes
 ```
 
+Terraform will create the AWS infrastructure.
+
 ---
 
-# 20. Verify ECS
+# 27. Verify VPC
 
-Check the ECS service:
-
-```bash
-aws ecs describe-services \
-  --cluster employee-management-cluster \
-  --services employee-management-service \
-  --region us-east-1
-```
-
-Check running tasks:
-
-```bash
-aws ecs list-tasks \
-  --cluster employee-management-cluster \
-  --service-name employee-management-service \
-  --region us-east-1
-```
-
-The task should show:
+After deployment, verify the VPC:
 
 ```text
-RUNNING
+VPC
+ |
+ +-- Internet Gateway
+ |
+ +-- Public Subnets
+ |
+ +-- Private Application Subnets
+ |
+ +-- Private Database Subnets
+ |
+ +-- Route Tables
+ |
+ +-- NAT Gateway
 ```
 
 ---
 
-# 21. Verify Backend
+# 28. Verify ALB
 
-Inside the ECS task, test the backend:
-
-```bash
-curl http://127.0.0.1:8080/api/employees
-```
-
-Expected response could be:
-
-```json
-[]
-```
-
-or employee data.
-
-If this works, the backend is reachable from the frontend container.
-
----
-
-# 22. Access the Application
-
-Get the ALB DNS:
+Check the ALB:
 
 ```bash
 aws elbv2 describe-load-balancers \
@@ -758,287 +914,263 @@ aws elbv2 describe-load-balancers \
 Example:
 
 ```text
-employee-alb-123456.us-east-1.elb.amazonaws.com
+three-tier-alb-123456.us-east-1.elb.amazonaws.com
 ```
 
-Open:
+Open the ALB DNS name in a browser.
 
 ```text
-http://employee-alb-123456.us-east-1.elb.amazonaws.com
-```
-
-The request flow is:
-
-```text
-Browser
-   |
-   | HTTP :80
-   v
-ALB
-   |
-   | Target Group
-   v
-ECS Fargate
-   |
-   v
-Frontend/Nginx :80
-   |
-   | /api/*
-   v
-Spring Boot :8080
-   |
-   v
-RDS MySQL :3306
+http://three-tier-alb-123456.us-east-1.elb.amazonaws.com
 ```
 
 ---
 
-# 23. Employee API
+# 29. Verify Target Health
 
-The frontend should call the API using a relative URL:
-
-```javascript
-axios.post("/api/employees", data);
-```
-
-Do not use:
-
-```javascript
-axios.post("http://localhost:8080/api/employees", data);
-```
-
-because `localhost` in the browser refers to the user's computer, not the ECS backend.
-
-Using:
-
-```javascript
-/api/employees
-```
-
-allows the request to go through the ALB and Nginx.
-
----
-
-# 24. Troubleshooting
-
-## ECS task stops
-
-Check:
-
-```text
-ECS
-→ Cluster
-→ Tasks
-→ Stopped
-→ Stopped reason
-```
-
-Also check CloudWatch logs.
-
----
-
-## Backend exits with code 143
-
-Exit code `143` generally means the process received:
-
-```text
-SIGTERM
-```
-
-This can happen when ECS stops/replaces the task.
-
-Check the task events and application logs to determine why ECS initiated the shutdown.
-
----
-
-## Frontend exits with code 1
-
-Check Nginx logs:
+Check whether the EC2 instances registered with the target group are healthy.
 
 ```bash
-docker logs <frontend-container>
-```
-
-Also verify:
-
-```bash
-nginx -t
-```
-
----
-
-## CloudWatch log group does not exist
-
-Create the log group before starting the ECS task:
-
-```bash
-aws logs create-log-group \
-  --log-group-name /ecs/employee-cluster \
+aws elbv2 describe-target-health \
+  --target-group-arn <TARGET-GROUP-ARN> \
   --region us-east-1
 ```
 
----
-
-## Fargate target group error
-
-If you see:
-
-```text
-target type instance is incompatible with awsvpc
-```
-
-change the target group:
-
-```hcl
-target_type = "ip"
-```
-
----
-
-## ALB cannot reach ECS
-
-Verify:
-
-```text
-ALB Security Group
-        |
-        v
-ECS Security Group
-        |
-        v
-Port 80
-```
-
-Also verify the target group shows:
+Expected status:
 
 ```text
 healthy
 ```
 
----
+Traffic flow:
 
-## Frontend cannot reach backend
-
-Check:
-
-```bash
-curl http://127.0.0.1:8080/api/employees
-```
-
-from the frontend container.
-
-If it fails, investigate the backend container.
-
-If it works, check the Nginx configuration:
-
-```nginx
-location /api/ {
-    proxy_pass http://127.0.0.1:8080/api/;
-}
+```text
+ALB
+ |
+ +---- EC2-1 → healthy
+ |
+ +---- EC2-2 → healthy
 ```
 
 ---
 
-# 25. Important Deployment Notes
+# 30. Database Connectivity
 
-Whenever you change the frontend code or `nginx.conf`:
+The application EC2 instances communicate with RDS using the RDS endpoint.
 
-```bash
-docker build -t frontend:latest .
-```
-
-Tag:
-
-```bash
-docker tag frontend:latest \
-public.ecr.aws/v4c7w1f2/full-stack-repo:frontend-v2
-```
-
-Push:
-
-```bash
-docker push \
-public.ecr.aws/v4c7w1f2/full-stack-repo:frontend-v2
-```
-
-Then update the ECS task definition:
+Example:
 
 ```text
-frontend-v1
+RDS Endpoint:
+my-rds.xxxxxxxxx.us-east-1.rds.amazonaws.com
 ```
 
-to:
+Application connection:
 
 ```text
-frontend-v2
+EC2
+ |
+ | MySQL :3306
+ v
+RDS MySQL
 ```
 
-and deploy the new task definition.
+The database is accessible only from the application security group.
 
-For backend changes, repeat the same process with:
+---
+
+# 31. Security Architecture
+
+The project follows a layered security model.
 
 ```text
-backend-v2
+                INTERNET
+                   |
+                   v
+              +---------+
+              |  ALB SG |
+              +----+----+
+                   |
+                   v
+              +---------+
+              |  APP SG |
+              +----+----+
+                   |
+                   v
+              +---------+
+              |  DB SG  |
+              +---------+
+```
+
+### Access Rules
+
+| Layer       | Port | Source                     |
+| ----------- | ---: | -------------------------- |
+| ALB         |   80 | Internet                   |
+| ALB         |  443 | Internet                   |
+| Application |   80 | ALB Security Group         |
+| Database    | 3306 | Application Security Group |
+
+This prevents direct internet access to the application and database layers.
+
+---
+
+# 32. High Availability
+
+The architecture uses multiple Availability Zones.
+
+```text
+                 VPC
+                  |
+        +---------+---------+
+        |                   |
+        v                   v
+    AZ-1a                 AZ-1b
+      |                      |
+      |                      |
+  Public Subnet          Public Subnet
+      |                      |
+      +-------- ALB --------+
+               |
+       +-------+-------+
+       |               |
+       v               v
+   App Subnet       App Subnet
+     EC2-1            EC2-2
+       |               |
+       +-------+-------+
+               |
+             RDS
+```
+
+Using multiple Availability Zones improves availability and reduces the impact of an Availability Zone failure.
+
+---
+
+# 33. Why Three-Tier Architecture?
+
+The main advantage is separation of responsibilities.
+
+### Web Tier
+
+Handles incoming traffic.
+
+```text
+ALB
+```
+
+### Application Tier
+
+Runs application/business logic.
+
+```text
+EC2
+```
+
+### Database Tier
+
+Stores application data.
+
+```text
+RDS MySQL
+```
+
+Each tier can be secured and scaled independently.
+
+---
+
+# 34. Final Architecture
+
+```text
+                         INTERNET
+                            |
+                            v
+                 +--------------------+
+                 |        ALB         |
+                 |    Public Subnets  |
+                 |      :80/:443      |
+                 +---------+----------+
+                           |
+                           |
+                    ┌──────┴──────┐
+                    |   WEB TIER  |
+                    | Public      |
+                    | Subnets     |
+                    └──────┬──────┘
+                           |
+                           | HTTP
+                           v
+              ┌─────────────────────────┐
+              |       APP TIER           |
+              |    Private Subnets       |
+              |                          |
+              |    EC2 Instance 1        |
+              |    EC2 Instance 2        |
+              └────────────┬────────────┘
+                           |
+                           | MySQL :3306
+                           v
+              ┌─────────────────────────┐
+              |      DATABASE TIER       |
+              |     Private Subnets      |
+              |                          |
+              |       RDS MySQL           |
+              └─────────────────────────┘
 ```
 
 ---
 
-# 26. Cleanup
+# 35. Final Result
 
-To remove the Terraform infrastructure:
+The Terraform project creates a complete AWS three-tier infrastructure consisting of:
+
+```text
+                    AWS VPC
+                       |
+        +--------------+--------------+
+        |              |              |
+        v              v              v
+    Web Tier       App Tier       DB Tier
+        |              |              |
+      ALB            EC2            RDS
+        |              |              |
+    Public          Private        Private
+    Subnets         Subnets        Subnets
+```
+
+The final request flow is:
+
+```text
+User
+ |
+ | HTTP/HTTPS
+ v
+Application Load Balancer
+ |
+ | HTTP
+ v
+EC2 Application Servers
+ |
+ | MySQL :3306
+ v
+Amazon RDS MySQL
+```
+
+The project demonstrates how to build a **secure, highly available, and modular three-tier AWS architecture using Terraform**, with public-facing resources isolated from private application and database resources.
+
+---
+
+# 36. Cleanup
+
+To remove the infrastructure created by Terraform:
 
 ```bash
 terraform destroy
 ```
 
-Review the resources and enter:
+Review the resources carefully and enter:
 
 ```text
 yes
 ```
 
-> Be careful when using `terraform destroy`, especially with RDS and production resources.
-
----
-
-# ✅ Final Architecture
-
-```text
-                    INTERNET
-                       |
-                       v
-              +----------------+
-              |      ALB       |
-              |      :80       |
-              +-------+--------+
-                      |
-                      v
-              +----------------+
-              |   ECS FARGATE  |
-              |                |
-              | +------------+ |
-              | | React/Nginx| |
-              | |    :80     | |
-              | +------+-----+ |
-              |        |       |
-              |        | /api  |
-              |        v       |
-              | +------------+ |
-              | | Spring Boot| |
-              | |    :8080   | |
-              | +------+-----+ |
-              +--------|-------+
-                       |
-                       v
-              +----------------+
-              |   RDS MySQL    |
-              |     :3306      |
-              +----------------+
-```
-Output
-Access the application through the ALB URL.
-<img width="1920" height="1080" alt="Screenshot (69)" src="https://github.com/user-attachments/assets/b5c632da-55b4-42cb-b451-833a7bdcfea4" />
-Data is stored in the database successfully.
-<img width="1920" height="1080" alt="Screenshot (70)" src="https://github.com/user-attachments/assets/50ae3215-5adc-4a93-9231-584f163e0fcc" />
-
-The application can therefore be accessed through **one ALB DNS**, while Nginx internally routes API requests to the Spring Boot container and Spring Boot communicates with the private RDS database.
+> **Warning:** `terraform destroy` permanently removes the Terraform-managed infrastructure. Take special care with RDS and any resources containing important data.
