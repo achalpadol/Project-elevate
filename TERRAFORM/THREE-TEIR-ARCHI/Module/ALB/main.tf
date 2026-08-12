@@ -14,7 +14,7 @@ resource "aws_lb_target_group" "this_tg" {
   port     = var.TARGET_GROUP_PORT
   protocol = var.TARGET_GROUP_PROTOCOL
   vpc_id   = var.VPC_ID
-  target_type = "ip"
+  target_type = VAR.INSTANCE.ID
    health_check {
     path                = var.HEALTH_CHECK_PATH
     protocol            = "HTTP"
