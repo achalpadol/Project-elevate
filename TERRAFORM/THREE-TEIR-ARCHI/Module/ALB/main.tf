@@ -37,8 +37,8 @@ resource "aws_lb_listener" "this_http" {
     target_group_arn = aws_lb_target_group.this_tg.arn
   }
 }
-# Target Group Attachment
-#resource "aws_lb_target_group_attachment" "this_app_server" {
-  #target_id        = var.INSTANCE_ID
-  #port             = var.TARGET_GROUP_PORT
-#}
+ Target Group Attachment
+resource "aws_lb_target_group_attachment" "this_app_server" {
+  target_id        = var.INSTANCE_ID
+  port             = var.TARGET_GROUP_PORT
+}
