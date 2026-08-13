@@ -4,36 +4,29 @@ ENABLE_DNS_SUPPORT   = true
 ENABLE_DNS_HOSTNAMES = true
 VPC_NAME             = "qa-vpc"
 IGW_NAME             = "qa-igw"
-
 # Public Subnets
 PUBLIC_SUBNET_CIDRS = [
   "10.1.1.0/24",
   "10.1.2.0/24"
 ]
-
 PUBLIC_SUBNET_AZS = [
   "us-east-1a",
   "us-east-1b"
 ]
-
 PUBLIC_SUBNET_NAMES = [
   "qa-public-web-1a",
   "qa-public-web-1b"
 ]
-
 MAP_PUBLIC_IP_ON_LAUNCH = true
-
 # Private App Subnets
 PRIVATE_APP_SUBNET_CIDRS = [
   "10.1.11.0/24",
   "10.1.12.0/24"
 ]
-
 PRIVATE_APP_SUBNET_AZS = [
   "us-east-1a",
   "us-east-1b"
 ]
-
 PRIVATE_APP_SUBNET_NAMES = [
   "qa-private-app-1a",
   "qa-private-app-1b"
@@ -108,20 +101,8 @@ LISTENER_PROTOCOL          = "HTTP"
 DEFAULT_ACTION_TYPE        = "forward"
 HEALTH_CHECK_PATH          = "/"
 
-# EC2
-AMI_ID               = "ami-0b6d9d3d33ba97d99"
-INSTANCE_TYPE        = "m7i-flex.large"
-INSTANCE_NAME        = "qa-application-server"
-KEY_NAME             = "terraform-key"
-KEY_ALGORITHM        = "RSA"
-RSA_BITS             = 4096
-PRIVATE_KEY_FILENAME = "terraform-key.pem"
-PUBLIC_KEY_PATH      = "/mnt/c/Users/admin/Downloads/"
-
 # IAM
 IAM_ROLE_NAME         = "QA-EC2-SSM-Role"
-INSTANCE_PROFILE_NAME = "QA-EC2-SSM-Profile"
-SSM_POLICY_ARN        = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 EXECUTION_ROLE_NAME   = "qa-employee-execution-role"
 TASK_ROLE_NAME        = "qa-employee-task-role"
 
