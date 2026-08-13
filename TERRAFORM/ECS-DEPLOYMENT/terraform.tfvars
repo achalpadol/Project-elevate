@@ -93,20 +93,9 @@ TARGET_GROUP_PROTOCOL      = "HTTP"
 LISTENER_PORT              = 80
 LISTENER_PROTOCOL          = "HTTP"
 DEFAULT_ACTION_TYPE        = "forward"
-HEALTH_CHECK_PATH          = "/"
-# ec2 tfvars
-AMI_ID               = "ami-0b6d9d3d33ba97d99"
-INSTANCE_TYPE        = "m7i-flex.large"
-INSTANCE_NAME        = "application-server"
-KEY_NAME             = "terraform-key"
-KEY_ALGORITHM        = "RSA"
-RSA_BITS             = 4096
-PRIVATE_KEY_FILENAME = "terraform-key.pem"
-PUBLIC_KEY_PATH      = "/mnt/c/Users/admin/Downloads/"
+
 # IAM role tfvars for session manager
 IAM_ROLE_NAME         = "EC2-SSM-Role"
-INSTANCE_PROFILE_NAME = "EC2-SSM-Profile"
-SSM_POLICY_ARN        = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 EXECUTION_ROLE_NAME   = "employee-execution-role"
 TASK_ROLE_NAME        = "employee-task-role"
 # ECS cluster
