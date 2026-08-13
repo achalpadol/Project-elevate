@@ -104,20 +104,8 @@ LISTENER_PROTOCOL          = "HTTP"
 DEFAULT_ACTION_TYPE        = "forward"
 HEALTH_CHECK_PATH          = "/"
 
-# EC2
-AMI_ID               = "ami-0b6d9d3d33ba97d99"
-INSTANCE_TYPE        = "m7i-flex.large"
-INSTANCE_NAME        = "uat-application-server"
-KEY_NAME             = "terraform-key"
-KEY_ALGORITHM        = "RSA"
-RSA_BITS             = 4096
-PRIVATE_KEY_FILENAME = "terraform-key.pem"
-PUBLIC_KEY_PATH      = "/mnt/c/Users/admin/Downloads/"
-
 # IAM
 IAM_ROLE_NAME         = "UAT-EC2-SSM-Role"
-INSTANCE_PROFILE_NAME = "UAT-EC2-SSM-Profile"
-SSM_POLICY_ARN        = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 EXECUTION_ROLE_NAME   = "uat-employee-execution-role"
 TASK_ROLE_NAME        = "uat-employee-task-role"
 
