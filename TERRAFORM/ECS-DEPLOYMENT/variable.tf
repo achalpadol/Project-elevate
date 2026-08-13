@@ -172,42 +172,8 @@ variable "ENABLE_DELETION_PROTECTION" {
   description = "Enable Deletion Protection"
   type        = bool
 }
-# EC2 Variables
-variable "AMI_ID" {
-  type = string
-}
-variable "INSTANCE_TYPE" {
-  type = string
-}
-variable "INSTANCE_NAME" {
-  type = string
-}
-variable "KEY_NAME" {
-  type = string
-}
-variable "KEY_ALGORITHM" {
-  description = "Key Algorithm"
-  type        = string
-}
-variable "RSA_BITS" {
-  description = "RSA Key Size"
-  type        = number
-}
-variable "PRIVATE_KEY_FILENAME" {
-  description = "Local Private Key Filename"
-  type        = string
-}
-variable "PUBLIC_KEY_PATH" {
-  type = string
-}
 # IAM Variables
 variable "IAM_ROLE_NAME" {
-  type = string
-}
-variable "INSTANCE_PROFILE_NAME" {
-  type = string
-}
-variable "SSM_POLICY_ARN" {
   type = string
 }
 variable "EXECUTION_ROLE_NAME" {
