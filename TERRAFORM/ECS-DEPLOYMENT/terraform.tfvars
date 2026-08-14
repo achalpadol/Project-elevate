@@ -95,7 +95,6 @@ LISTENER_PROTOCOL          = "HTTP"
 DEFAULT_ACTION_TYPE        = "forward"
 
 # IAM role tfvars for session manager
-IAM_ROLE_NAME         = "EC2-SSM-Role"
 EXECUTION_ROLE_NAME   = "employee-execution-role"
 TASK_ROLE_NAME        = "employee-task-role"
 # ECS cluster
