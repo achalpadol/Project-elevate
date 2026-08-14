@@ -173,9 +173,6 @@ variable "ENABLE_DELETION_PROTECTION" {
   type        = bool
 }
 # IAM Variables
-variable "IAM_ROLE_NAME" {
-  type = string
-}
 variable "EXECUTION_ROLE_NAME" {
   type = string
 }
