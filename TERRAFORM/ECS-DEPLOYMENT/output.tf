@@ -29,25 +29,6 @@ output "target_group_arn" {
 output "listener_arn" {
   value = module.alb.listener_arn
 }
-# EC2 output.tf
-output "instance_id" {
-  value = module.ec2.instance_id
-}
-output "private_ip" {
-  value = module.ec2.private_ip
-}
-output "availability_zone" {
-  value = module.ec2.availability_zone
-}
-output "instance_state" {
-  value = module.ec2.instance_state
-}
-output "key_name" {
-  value = module.ec2.key_name
-}
-output "private_key_file" {
-  value = module.ec2.private_key_file
-}
 #  IAM role for session manager 
 output "iam_role_name" {
   value = module.iam.iam_role_name
