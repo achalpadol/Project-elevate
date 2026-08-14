@@ -29,18 +29,22 @@ output "target_group_arn" {
 output "listener_arn" {
   value = module.alb.listener_arn
 }
-#  IAM role for session manager 
-output "iam_role_name" {
-  value = module.iam.iam_role_name
+#  IAM role 
+output "execution_role_arn" {
+  description = "ARN of the ECS Task Execution Role"
+  value       = aws_iam_role.this_ecs_execution_role.arn
 }
-output "iam_role_arn" {
-  value = module.iam.iam_role_arn
+output "execution_role_name" {
+  description = "Name of the ECS Task Execution Role"
+  value       = aws_iam_role.this_ecs_execution_role.name
 }
-output "instance_profile_name" {
-  value = module.iam.instance_profile_name
+output "task_role_arn" {
+  description = "ARN of the ECS Task Role"
+  value       = aws_iam_role.this_ecs_task_role.arn
 }
-output "instance_profile_arn" {
-  value = module.iam.instance_profile_arn
+output "task_role_name" {
+  description = "Name of the ECS Task Role"
+  value       = aws_iam_role.this_ecs_task_role.name
 }
 #ECS-Cluster
 output "ecs_cluster_name" {
