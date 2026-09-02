@@ -1,0 +1,149 @@
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+Que 5 →
+● Clone https://github.com/zembutsu/docker-sample-nginx.git on your local system.
+● Initialize one repo on your local system named Cloudethix-nginix-yourname and then
+copy all the content from cloned repo to your local repo.
+● Update the index.html and add the name CloudEthiX along with Hostname. Commit the
+change to your local repository. Then create and push the code from the local repository
+to your remote repository named Cloudethix-nginix-yourname under master branch.
+● Once code is pushed, create a Docker hub public repository named
+Cloudethix-nginix-yourname.
+● Then build the docker image out of the dockerfile. Once an image is built, tag the image
+and push that image to the docker hub repo you created.
+● Create a deployment.yaml file with 2 replications in cloudethix_yourname Namespace
+and use the container image that you have pushed to your docker hub repo. Once a file
+is created, run the deployment in k8s cluster.
+● Please prepare a document along with the snap and share it across
+
+---------------------------------------------------------------------------------------------------------------------------------------------------
+
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ ls
+Dockerfile  LICENSE  README.md  default.conf  deployment.yml  index.html
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ cat Dockerfile index.html deployment.yml
+
+FROM docker.io/library/nginx:alpine
+
+COPY default.conf /etc/nginx/conf.d/
+COPY index.html /usr/share/nginx/html/
+
+==========================================================================================
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CloudEthiX Nginx</title>
+</head>
+<body>
+    <h1>CloudEthiX</h1>
+    <h2>Hostname: nginx</h2>
+</body>
+</html>
+
+===========================================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudethix-nginx
+  namespace: cloudethix-achal
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: cloudethix-nginx
+
+  template:
+    metadata:
+      labels:
+        app: cloudethix-nginx
+
+    spec:
+      containers:
+        - name: nginx
+          image: docker.io/achalpadol/cloudethix-nginix-achal:v1
+          ports:
+            - containerPort: 80
+			
+================================================================================================		
+
+achal@LAPTOP-HPUOTJF1:~$ ls
+01_pod_nginx.yaml  configmap.yml    docker-sample-nginx 
+
+achal@LAPTOP-HPUOTJF1:~/docker-sample-nginx$ cd ~
+
+achal@LAPTOP-HPUOTJF1:~$ mkdir Cloudethix-nginix-achal
+
+achal@LAPTOP-HPUOTJF1:~$ cd Cloudethix-nginix-achal/
+
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ git init
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: will change to "main" in Git 3.0. To configure the initial branch name
+hint: to use in all of your new repositories, which will suppress this warning,
+hint: call:	
+
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ git branch -M master
+
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ cp -r ~/docker-sample-nginx/. .
+
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ ls
+Dockerfile  LICENSE  README.md  default.conf  index.html
+
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ cat index.html
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CloudEthiX Nginx</title>
+</head>
+<body>
+    <h1>CloudEthiX</h1>
+    <h2>Hostname: nginx</h2>
+</body>
+</html>
+
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ git log --oneline
+2f44351 (HEAD -> master, origin/master) Update index with CloudEthiX and Hostname
+5fa2461 Initial commit with nginx application
+
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ vim Dockerfile
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ cat Dockerfile
+FROM docker.io/library/nginx:alpine
+COPY default.conf /etc/nginx/conf.d/
+COPY index.html /usr/share/nginx/html/
+
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ podman build -t cloudethix-nginix-achal:v1 .
+
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ podman images
+REPOSITORY                         TAG               IMAGE ID      CREATED         SIZE
+localhost/cloudethix-nginix-achal  v1                97ebac177727  29 seconds ago  64.2 MB
+
+
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ kubectl create namespace cloudethix-achal
+namespace/cloudethix-achal created
+
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ kubectl get namespace
+NAME                   STATUS   AGE
+cloudethix-achal       Active   29s
+
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ podman tag localhost/achalpadol/cloudethix-nginix-achal:v1 \
+docker.io/achalpadol/cloudethix-nginix-achal:v1
+
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ podman images
+REPOSITORY                                    TAG               IMAGE ID      CREATED         SIZE
+localhost/cloudethix-nginix-achal             v1                97ebac177727  21 minutes ago  64.2 MB
+localhost/achalpadol/cloudethix-nginix-achal  v1                97ebac177727  21 minutes ago  64.2 MB
+docker.io/achalpadol/cloudethix-nginix-achal  v1                97ebac177727  21 minutes ago  64.2 MB
+
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ podman push docker.io/achalpadol/cloudethix-nginix-achal:v1
+Getting image source signatures
+
+chal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ vim deployment.yml
+
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ kubectl apply -f deployment.yml
+deployment.apps/cloudethix-nginx created
+
+achal@LAPTOP-HPUOTJF1:~/Cloudethix-nginix-achal$ kubectl get pod -n cloudethix-achal
+NAME                                READY   STATUS    RESTARTS   AGE
+cloudethix-nginx-5d77d6699f-7wkwp   1/1     Running   0          26s
+cloudethix-nginx-5d77d6699f-ktvsq   1/1     Running   0          26s
