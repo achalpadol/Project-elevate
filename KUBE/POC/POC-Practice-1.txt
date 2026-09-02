@@ -1,0 +1,635 @@
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+POC 1 — ConfigMap: Volume Mount + Env Var Reference
+Create ConfigMap app-config with keys: APP_ENV=production, APP_NAME=inventory-service.
+Create pod config-inspector (toolbox image), that:
+mounts app-config as a volume at /etc/app/config
+also injects APP_ENV as an environment variable via configMapKeyRef
+Verify:
+kubectl exec config-inspector -- cat /etc/app/config/APP_ENV
+kubectl exec config-inspector -- printenv APP_ENV
+Expected result: /etc/app/config/APP_ENV contains production. /etc/app/config/APP_NAME also exists and contains inventory-service (mounted as a whole ConfigMap, both keys appear as files). printenv APP_ENV returns production. Only APP_ENV exists as an env var — APP_NAME does not, since it was never referenced with configMapKeyRef.
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1$ cat app-config.yaml config-inspector.yml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: poc
+data:
+  APP_ENV: production
+  APP_NAME: inventory-service
+====================================================================================================  
+apiVersion: v1
+kind: Pod
+metadata:
+  name: config-inspector
+  namespace: poc
+spec:
+  containers:
+    - name: toolbox
+      image: docker.io/achalpadol/kube-repo:toolbox-v1:
+      # Inject only APP_ENV as an environment variable
+      env:
+        - name: APP_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: APP_ENV
+
+      # Mount the complete ConfigMap as files
+      volumeMounts:
+        - name: app-config-volume
+          mountPath: /etc/app/config
+
+  volumes:
+    - name: app-config-volume
+      configMap:
+        name: app-config
+
+=====================================================================================
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1$ kubectl exec config-inspector -- cat /etc/app/config/APP_ENV
+
+productionachal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1$ kubectl exec config-inspector -- printenv APP_ENV
+production
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1$ kubectl exec config-inspector -n poc -- ls /etc/app/config
+APP_ENV
+APP_NAME
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1$ kubectl exec config-inspector -n poc -- ls -l /etc/app/config
+total 0
+lrwxrwxrwx    1 root     root            14 Sep  1 07:08 APP_ENV -> ..data/APP_ENV
+lrwxrwxrwx    1 root     root            15 Sep  1 07:08 APP_NAME -> ..data/APP_NAME
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------
+POC 2 — ConfigMap: Mounting a Single Key (subPath)
+Reuse ConfigMap app-config from POC 1.
+Create pod config-subpath (toolbox image) that mounts only the APP_NAME key from app-config to the path /etc/app/name.txt, using subPath.
+Verify: kubectl exec config-subpath -- cat /etc/app/name.txt and kubectl exec config-subpath -- ls /etc/app.
+Expected result: /etc/app/name.txt contains inventory-service. ls /etc/app shows only name.txt — APP_ENV is not present anywhere in the pod, confirming subPath mounts a single key instead of the whole ConfigMap.
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-Practice-2$ cat config-subpath.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: config-subpath-1
+  namespace: poc
+spec:
+  containers:
+    - name: toolbox
+      image: docker.io/achalpadol/kube-repo:toolbox-v1
+
+      volumeMounts:
+        - name: app-config
+          mountPath: /etc/app/name.txt
+          subPath: APP_NAME
+
+  volumes:
+    - name: app-config
+      configMap:
+        name: app-config
+=====================================================================================================================================================
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-Practice-2$ kubectl exec config-subpath -- cat /etc/app/name.txt
+
+inventory-serviceachal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-Practice-2$ kubectl exec config-subpath -- ls /etc/app
+name.txt
+
+
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+POC 3 — Secret: Volume Mount + Env Var Reference
+Create Secret db-credentials with keys username and password.
+Create pod secret-inspector (toolbox image), that:
+mounts db-credentials as a volume at /etc/app/secrets
+injects username as env var DB_USERNAME via secretKeyRef
+Verify:
+kubectl exec secret-inspector -- cat /etc/app/secrets/username
+kubectl exec secret-inspector -- cat /etc/app/secrets/password
+kubectl exec secret-inspector -- printenv DB_USERNAME
+kubectl exec secret-inspector -- ls -l /etc/app/secrets
+Expected result: Both username and password appear as files under /etc/app/secrets with their decoded (plaintext) values. printenv DB_USERNAME returns the username value. ls -l shows the Secret volume mounted with restrictive file permissions (0644 by default, root-owned) and backed by tmpfs rather than disk.
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-3$ ls
+db-credentials-1.yaml  secret-inspector-1.yaml
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-3$ cat db-credentials-1.yaml secret-inspector-1.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-credentials-1
+  namespace: poc
+type: Opaque
+stringData:
+  username: admin
+  password: mypassword12345
+================================================================================================================================================  
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secret-inspector
+  namespace: poc
+
+spec:
+  containers:
+    - name: inspector
+      image: docker.io/achalpadol/kube-repo:toolbox-v1
+	  
+      env:
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials-1
+              key: username
+
+      volumeMounts:
+        - name: db-secret
+          mountPath: /etc/app/secrets
+          readOnly: true
+
+  volumes:
+    - name: db-secret
+      secret:
+        secretName: db-credentials-1
+============================================================================================================================================
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-3$ kubectl exec secret-inspector -n poc -- cat /etc/app/secrets/username
+adminachal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/PO^C
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-3$ kubectl exec secret-inspector -n poc -- cat /etc/app/secrets/password
+
+mypassword12345achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-3$ kubectl exec secret-inspector -n poc -- printenv DB_USERNAME
+admin
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-3$ kubectl exec secret-inspector -n poc -- ls -l /etc/app/secrets
+total 0
+lrwxrwxrwx    1 root     root            15 Sep  1 09:37 password -> ..data/password
+lrwxrwxrwx    1 root     root            15 Sep  1 09:37 username -> ..data/username
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-3$ kubectl exec secret-inspector -n poc -- stat -c '%a %U:%G %n' /etc/app/secrets/..data/username
+644 root:root /etc/app/secrets/..data/username
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-3$ kubectl exec secret-inspector -n poc -- stat -c '%a %U:%G %n' /etc/app/secrets/..data/password
+644 root:root /etc/app/secrets/..data/password
+
+----------------------------------------------------------------------------------------------------------------------------------------------
+POC 4 — Secret: Mounting a Single Key with Custom Permissions
+Reuse Secret db-credentials.
+Create pod secret-subpath (toolbox image) that mounts only the password key to /etc/app/secret-password, using subPath, with defaultMode: 0400.
+Verify: kubectl exec secret-subpath -- cat /etc/app/secret-password and kubectl exec secret-subpath -- ls -l /etc/app/secret-password.
+Expected result: File contains the password value only; username is not present in the pod at all. File permission mode shows 0400 (read-only for owner), confirming defaultMode was applied.
+-----------------------------------------------------------------------------------------------------------------------------------------------
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-4$ cat secret-subpath-1.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secret-subpath-1
+  namespace: poc
+spec:
+  containers:
+    - name: secret-subpath-1
+      image: docker.io/achalpadol/kube-repo:toolbox-v1
+
+      volumeMounts:
+        - name: secret-volume
+          mountPath: /etc/app/secret-password
+          subPath: password
+
+  volumes:
+    - name: secret-volume
+      secret:
+        secretName: db-credentials-1
+        defaultMode: 0400
+		
+		
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-4$ kubectl exec secret-subpath-1 -n poc -- ls -l /etc/app/secret-password
+-r--------    1 root     root            15 Sep  1 10:04 /etc/app/secret-password
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-4$ kubectl exec secret-subpath-1 -n poc -- cat /etc/app/secret-password
+mypassword12345achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-4$
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------
+POC 5 — ServiceAccount: Assignment + Auto-Mounted Volume
+Create ServiceAccount app-sa.
+Create pod sa-test (toolbox image) with serviceAccountName: app-sa.
+Verify:
+kubectl get pod sa-test -o jsonpath='{.spec.serviceAccountName}'
+kubectl exec sa-test -- ls /var/run/secrets/kubernetes.io/serviceaccount
+kubectl exec sa-test -- cat /var/run/secrets/kubernetes.io/serviceaccount/namespace
+Expected result: spec.serviceAccountName returns app-sa. Without any explicit volume defined in the pod spec, /var/run/secrets/kubernetes.io/serviceaccount contains three auto-projected files: token, ca.crt, and namespace. The namespace file contains the pod's actual namespace — confirming Kubernetes injects this volume automatically for every ServiceAccount.
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-5$ cat app-sa-1.yaml sa-test-1.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app-sa-1
+  namespace: poc
+=================================================================================================================================================  
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sa-test-1
+  namespace: poc
+spec:
+  serviceAccountName: app-sa-1
+
+  containers:
+    - name: sa-test-1
+      image: docker.io/achalpadol/kube-repo:toolbox-v1
+
+==================================================================================================================================================
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-5$ kubectl get pod sa-test-1 -n poc -o jsonpath='{.spec.serviceAccountName}'
+
+app-sa-1achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1kubectl exec sa-test-1 -n poc -- ls /var/run/secrets/kubernetes.io/serviceaccount
+ca.crt
+namespace
+token
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-5$ kubectl exec sa-test-1 -n poc -- cat /var/run/secrets/kubernetes.io/serviceaccount/namespace
+
+pocachal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-5$
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------
+POC 6 — ServiceAccount: Disabling Auto-Mount
+Create ServiceAccount app-sa-no-mount with automountServiceAccountToken: false.
+Create pod sa-no-mount-test (toolbox image) using that ServiceAccount.
+Verify: kubectl exec sa-no-mount-test -- ls /var/run/secrets/kubernetes.io/serviceaccount.
+Expected result: The command fails with "No such file or directory" — no token volume is mounted, confirming automountServiceAccountToken: false on the ServiceAccount (or on the pod spec) suppresses the default auto-mount behavior.
+-------------------------------------------------------------------------------------------------------------------------------------------------
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-6$ ls
+app-sa-no-mount-1.yaml  sa-no-mount-test-1.yaml
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-6$ cat app-sa-no-mount-1.yaml sa-no-mount-test-1.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app-sa-no-mount-1
+  namespace: poc
+automountServiceAccountToken: false
+==================================================================================================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sa-no-mount-test-1
+  namespace: poc
+spec:
+  serviceAccountName: app-sa-no-mount-1
+
+  containers:
+    - name: sa-no-mount-test-1
+      image: docker.io/achalpadol/kube-repo:toolbox-v1
+==================================================================================================================================================
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-6$ kubectl exec sa-no-mount-test-1 -n poc -- ls /var/run/secrets/kubernetes.io/serviceaccount
+ls: /var/run/secrets/kubernetes.io/serviceaccount: No such file or directory
+command terminated with exit code 1
+
+---------------------------------------------------------------------------------------------------------------------------------------------------
+POC 7 — PV + PVC: Persistence Across Pod Recreation
+Create a 1Gi PersistentVolume (hostPath is fine for a local cluster).
+Create a PVC that binds to it.
+Create pod pvc-test (toolbox image), mounting the PVC at /data.
+kubectl exec pvc-test -- sh -c 'echo hello-from-poc7 > /data/hello.txt'
+Delete pod pvc-test. Recreate it with the same PVC.
+kubectl exec pvc-test -- cat /data/hello.txt
+Expected result: /data/hello.txt still contains hello-from-poc7 after the pod is recreated. kubectl get pvc shows the claim remains Bound throughout, confirming PV/PVC lifecycle is independent of the pod lifecycle.
+
+------------------------------------------------------------------------------------------------------------------------------------------------------
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-7$ la
+pv-1.yml  pvc-1.yml  pvc-test-1.yml
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-7$ cat pv-1.yml pvc-1.yml pvc-test-1.yml
+
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: poc-pv-1
+spec:
+  capacity:
+    storage: 1Gi
+
+  accessModes:
+    - ReadWriteOnce
+
+  persistentVolumeReclaimPolicy: Retain
+
+  storageClassName: poc-storage-1
+
+  hostPath:
+    path: /mnt/data/poc-pv
+    type: DirectoryOrCreate	
+=======================================================================================================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: poc-pvc-1
+  namespace: poc
+spec:
+  accessModes:
+    - ReadWriteOnce
+
+  storageClassName: poc-storage-1
+
+  resources:
+    requests:
+      storage: 1Gi
+===================================================================================================================================================	  
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pvc-test-1
+  namespace: poc
+
+spec:
+  containers:
+    - name: pvc-test-1
+      image: docker.io/achalpadol/kube-repo:toolbox-v1
+
+      volumeMounts:
+        - name: poc-storage-1
+          mountPath: /data
+
+  volumes:
+    - name: poc-storage-1
+      persistentVolumeClaim:
+        claimName: poc-pvc-1
+====================================================================================================================================================
+pvc-test-1   1/1     Running   0          10s
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-7$ kubectl exec pvc-test-1 -n poc -- sh -c 'echo hello-from-poc7 > /data/hello.txt'
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-7$ kubectl exec pvc-test-1 -n poc -- cat /data/hello.txt
+hello-from-poc7
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-7$ kubectl delete pod pvc-test-1 -n poc
+pod "pvc-test-1" deleted from poc namespace
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-7$ kubectl get pvc poc-pvc-1 -n poc
+NAME        STATUS   VOLUME     CAPACITY   ACCESS MODES   STORAGECLASS    VOLUMEATTRIBUTESCLASS   AGE
+poc-pvc-1   Bound    poc-pv-1   1Gi        RWO            poc-storage-1   <unset>                 3m33s
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-7$ kubectl apply -f pvc-test-1.yml
+pod/pvc-test-1 created
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-7$ kubectl exec pvc-test-1 -n poc -- cat /data/hello.txt
+hello-from-poc7
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------
+POC 8 — Two Pods Sharing One PVC
+Reuse (or create another) PVC.
+Create pod-a and pod-b (both toolbox image), mounting the same PVC at /data.
+pod-a: kubectl exec pod-a -- sh -c 'echo shared-data > /data/test.txt'
+pod-b: kubectl exec pod-b -- cat /data/test.txt
+Expected result: If both pods land on the same node and the PV is ReadWriteOnce, pod-b successfully reads shared-data — RWO restricts the volume to a single node, not a single pod, so co-located pods can share it. If the scheduler places pod-b on a different node, the mount fails or the pod stays stuck in ContainerCreating, since an RWO volume can't attach to two nodes at once. A ReadWriteMany PV (e.g. NFS-backed) would succeed regardless of node placement.
+----------------------------------------------------------------------------------------------------------------------------------------------------
+chal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-8$ ls
+nfs-server.yaml  nfs-service.yaml  nfs-storageclass.yaml  rwx-test.yaml  shared-pvc.yaml
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-8$ cat nfs-server.yaml nfs-service.yaml nfs-storageclass.yaml rwx-test.yaml shared-pvc.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-server
+  namespace: poc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfs-server
+  template:
+    metadata:
+      labels:
+        app: nfs-server
+    spec:
+      containers:
+        - name: nfs-server
+          image: itsthenetwork/nfs-server-alpine:latest
+          securityContext:
+            privileged: true
+          env:
+            - name: SHARED_DIRECTORY
+              value: /exports
+          ports:
+            - name: nfs
+              containerPort: 2049
+              protocol: TCP
+          volumeMounts:
+            - name: exports
+              mountPath: /exports
+      volumes:
+        - name: exports
+          emptyDir: {}
+===========================================================================================================================================		  
+		  
+apiVersion: v1
+kind: Service
+metadata:
+  name: nfs-server
+  namespace: poc
+spec:
+  type: ClusterIP
+  selector:
+    app: nfs-server
+  ports:
+    - name: nfs
+      port: 2049
+      targetPort: 2049
+      protocol: TCP
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-csi
+provisioner: nfs.csi.k8s.io
+parameters:
+  server: nfs-server.poc.svc.cluster.local
+  share: /
+  onDelete: delete
+mountOptions:
+  - nfsvers=4.1
+==================================================================================================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rwx-test
+  namespace: poc
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: rwx-test
+  template:
+    metadata:
+      labels:
+        app: rwx-test
+    spec:
+      containers:
+        - name: test
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Pod started: $(hostname)"
+              sleep 3600
+          volumeMounts:
+            - name: shared
+              mountPath: /shared
+      volumes:
+        - name: shared
+          persistentVolumeClaim:
+            claimName: shared-data
+=============================================================================================================================================			
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shared-data
+  namespace: poc
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-csi
+  resources:
+    requests:
+      storage: 1Gi
+===============================================================================================================================================
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-8$ kubectl get pods
+NAME                          READY   STATUS    RESTARTS        AGE
+config-inspector              1/1     Running   4 (14m ago)     5h6m
+config-subpath                1/1     Running   1 (3h15m ago)   4h34m
+nfs-server-86694c4b7c-5ndl8   1/1     Running   0               11m
+pvc-test-1                    1/1     Running   0               26m
+rwx-test-67b545d787-7g5dr     1/1     Running   0               10m
+rwx-test-67b545d787-l9bqj     1/1     Running   0               10m
+sa-no-mount-test-1            1/1     Running   0               97m
+sa-test-1                     1/1     Running   0               115m
+secret-inspector              1/1     Running   0               157m
+secret-subpath-1              1/1     Running   0               130m
+
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-8$ kubectl exec -n poc rwx-test-67b545d787-7g5dr -- sh -c 'echo "hello from $(hostname)" > /sha
+red/test.txt'
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-8$ kubectl exec -n poc rwx-test-67b545d787-l9bqj -- cat /shared/test.txt
+hello from rwx-test-67b545d787-7g5dr	  
+
+--------------------------------------------------------------------------------------------------------------------------------------------------
+
+POC 9 — Pod-to-Pod Communication via Service (order-service → inventory-service)
+Create pod inventory-service using your pushed inventory-service image (from Image 2 above), that mounts ConfigMap app-config (from POC 1) as a volume at /etc/app/config, container port 5678.
+Create a ClusterIP Service named inventory-service targeting port 5678 on that pod.
+Create pod order-service using your pushed order-service image (from Image 3 above).
+From order-service: kubectl exec order-service -- curl -s http://inventory-service:5678
+Also try kubectl exec order-service -- curl -s http://<inventory-pod-IP>:5678 — note it also works right now.
+Delete and recreate the inventory-service pod (keep the Service and ConfigMap mount as-is). Get its new Pod IP.
+Curl again using the old Pod IP (fails) vs the Service name (still works).
+Expected result: Both curls in step 4/5 return a text response including config file APP_ENV: production. After recreating the pod in step 6, the old Pod IP curl fails (connection refused/timeout), while curl http://inventory-service:5678 in step 7 still succeeds and shows the same output — confirming the Service routes to whichever pod currently matches its selector, regardless of Pod IP changes.
+
+---------------------------------------------------------------------------------------------------------------------------------------------------
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-9$ ls
+inventory-service-pod-1.yaml  inventory-service-svc-1.yaml  order-service-1.yaml
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-9$ cat inventory-service-pod-1.yaml inventory-service-svc-1.yaml order-service-1.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: inventory-service-pod-1
+  namespace: poc
+  labels:
+    app: inventory-service-1
+spec:
+  containers:
+    - name: inventory-service-1
+      image: docker.io/achalpadol/kube-repo:inventory-v1
+
+      ports:
+        - containerPort: 5678
+
+      volumeMounts:
+        - name: app-config
+          mountPath: /etc/app/config
+
+  volumes:
+    - name: app-config
+      configMap:
+        name: app-config
+========================================================================================================================================		
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-service-1
+  namespace: poc
+spec:
+  type: ClusterIP
+
+  selector:
+    app: inventory-service-1
+
+  ports:
+    - port: 5678
+      targetPort: 5678
+      protocol: TCP
+============================================================================================================================================	  
+apiVersion: v1
+kind: Pod
+metadata:
+  name: order-service-1
+  namespace: poc
+spec:
+  containers:
+    - name: order-service-1
+      image: docker.io/achalpadol/kube-repo:order-service-v1
+==============================================================================================================================================
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-9$ kubectl exec order-service-1 -n poc -- curl -s http://inventory-service-1:5678
+INVENTORY SERVICE
+==================
+APP_ENV env var: <not set>
+DB_USERNAME env var: <not set>
+config file APP_ENV: production
+config file APP_NAME: inventory-serviceachal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-9$
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-9$ kubectl get endpoints inventory-service-1 -n poc
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME                  ENDPOINTS           AGE
+inventory-service-1   10.244.1.112:5678   38m
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-9$ kubectl get pod inventory-service-pod-1 -n poc -o wide
+NAME                      READY   STATUS    RESTARTS   AGE   IP             NODE           NOMINATED NODE   READINESS GATES
+inventory-service-pod-1   1/1     Running   0          11m   10.244.1.112   minikube-m02   <none>           <none>
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-9$ kubectl exec order-service-1 -n poc -- curl -s http://10.244.1.112:5678
+INVENTORY SERVICE
+==================
+APP_ENV env var: <not set>
+DB_USERNAME env var: <not set>
+config file APP_ENV: production
+config file APP_NAME: inventory-serviceachal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-9$
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-9$ kubectl delete pod -n poc inventory-service-pod-1
+pod "inventory-service-pod-1" deleted from poc namespace
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-9$ kubectl apply -f inventory-service-pod-1.yaml
+pod/inventory-service-pod-1 created
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-9$ kubectl get pod inventory-service-pod-1 -n poc -o wide
+NAME                      READY   STATUS    RESTARTS   AGE   IP             NODE           NOMINATED NODE   READINESS GATES
+inventory-service-pod-1   1/1     Running   0          40s   10.244.1.113   minikube-m02   <none>           <none>
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-9$ kubectl get endpoints inventory-service-1 -n poc
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME                  ENDPOINTS           AGE
+inventory-service-1   10.244.1.113:5678   46m
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-9$
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-9$ kubectl exec order-service-1 -n poc -- curl -s http://10.244.1.112:5678
+command terminated with exit code 7
+
+achal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-9$ kubectl exec order-service-1 -n poc -- curl -s http://inventory-service-1:5678
+INVENTORY SERVICE
+==================
+APP_ENV env var: <not set>
+DB_USERNAME env var: <not set>
+config file APP_ENV: production
+config file APP_NAME: inventory-serviceachal@LAPTOP-HPUOTJF1:/mnt/c/KUBE_VS_CODE/POC-PRACTICE-1/POC-9$
