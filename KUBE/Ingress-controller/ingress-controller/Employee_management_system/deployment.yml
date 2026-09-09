@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app-frontend
+  labels:
+    app: web-app-frontend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web-app-frontend
+  template:
+    metadata:
+      labels:
+        app: web-app-frontend
+    spec:
+      containers:
+      - name: nginx-container-frontend
+        image: docker.io/achalpadol/react-app:frontend-v2
+        ports:
+        - containerPort: 80
+
