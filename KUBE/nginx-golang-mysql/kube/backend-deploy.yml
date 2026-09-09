@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: app2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: docker.io/achalpadol/nginx-go:latest
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 8000
+
+          env:
+            - name: DB_HOST
+              value: "db"
+
+            - name: DB_PORT
+              value: "3306"
+
+            - name: DB_NAME
+              value: "example"
+
+            - name: DB_USER
+              value: "root"
+
+          volumeMounts:
+            - name: db-password
+              mountPath: /run/secrets
+              readOnly: true
+
+      volumes:
+        - name: db-password
+          secret:
+            secretName: backend-secret
