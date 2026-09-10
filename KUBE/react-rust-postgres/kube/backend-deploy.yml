@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: app4
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: backend
+
+  template:
+    metadata:
+      labels:
+        app: backend
+
+    spec:
+      containers:
+        - name: backend
+          image: docker.io/achalpadol/react-rust-post-backend:v2
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 8000
+
+          env:
+            - name: ADDRESS
+              value: "0.0.0.0:8000"
+
+            - name: RUST_LOG
+              value: "debug"
+
+            - name: PG_DBNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: db-config
+                  key: PG_DBNAME
+
+            - name: PG_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: db-config
+                  key: PG_HOST
+
+            - name: PG_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: db-config
+                  key: PG_USER
+
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: PG_PASSWORD
+
+            - name: PG_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: db-config
+                  key: PG_PORT
