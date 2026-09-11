@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: docker.io/achalpadol/kubernetes-ingress:app3-backend-v2
+          image: docker.io/achalpadol/react-java-backend:v1
 
           ports:
             - containerPort: 8080
