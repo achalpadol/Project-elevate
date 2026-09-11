@@ -28,13 +28,22 @@ spec:
 
           env:
             - name: MYSQL_HOST
-              value: db
+              valueFrom:
+                configMapKeyRef:
+                  name: app3-config
+                  key: MYSQL_HOST
 
-            - name: MYSQL_DATABASE
-              value: example
+          - name: MYSQL_DATABASE
+            valueFrom:
+              configMapKeyRef:
+                name: app3-config
+                key: MYSQL_DATABASE
 
-            - name:  MYSQL_USER
-              value: root
+          - name: MYSQL_USER
+            valueFrom:
+              configMapKeyRef:
+                name: app3-config
+                key: MYSQL_USER
 
           volumeMounts:
             - name: db-password
