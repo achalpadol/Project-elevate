@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: docker.io/payalkharat/kubernetes-ingress:app3-backend-v1
+          image: docker.io/achalpadol/k8s-ingress:app3-backend-v1
 
           ports:
             - containerPort: 8080
