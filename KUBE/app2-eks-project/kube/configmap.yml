@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app2-config
+  namespace: eks-2
+
+data:
+  DB_HOST: "db"
+  DB_PORT: "3306"
+  DB_NAME: "example"
+  DB_USER: "root"
