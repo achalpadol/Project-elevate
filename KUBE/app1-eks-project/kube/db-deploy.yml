@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app1-db
+  namespace: eks-1
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: app1-db
+
+  template:
+    metadata:
+      labels:
+        app: app1-db
+
+    spec:
+      automountServiceAccountToken: false
+
+      containers:
+        - name: db
+          image: docker.io/achalpadol/ingress-cont-db:v2
+          
+
+          ports:
+            - containerPort: 3306
+
+          env:
+            - name: MYSQL_DATABASE
+              value: example
+
+            - name: MYSQL_ROOT_PASSWORD_FILE
+              value: /run/secrets/db-password
+
+          volumeMounts:
+            - name: db-password
+              mountPath: /run/secrets
+              readOnly: true
+
+
+      volumes:
+        - name: db-password
+          secret:
+            secretName: app1-db-secret
+
+        

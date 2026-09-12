@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app1-backend
+  namespace: eks-1
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: app1-backend
+
+  template:
+    metadata:
+      labels:
+        app: app1-backend
+
+    spec:
+      automountServiceAccountToken: false
+
+      containers:
+        - name: backend
+          image: docker.io/achalpadol/ingress-cont-backend:latest
+
+          ports:
+            - containerPort: 8000
+
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app1-config
+                  key: DB_HOST
+            
+          volumeMounts:
+            - name: db-password
+              mountPath: /run/secrets
+              readOnly: true
+
+      volumes:
+        - name: db-password
+          secret:
+            secretName: app1-db-secret
