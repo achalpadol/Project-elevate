@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: app-backend
+  namespace: eks-3
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: backend
+
+  template:
+    metadata:
+      labels:
+        app: backend
+
+    spec:
+      containers:
+        - name: backend
+          image: docker.io/payalkharat/kubernetes-ingress:app3-backend-v1
+
+          ports:
+            - containerPort: 8080
+
+          env:
+            - name: MYSQL_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app3-config
+                  key: MYSQL_HOST
+
+            - name: MYSQL_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: app3-config
+                  key: MYSQL_DATABASE
+
+            - name: MYSQL_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: app3-config
+                  key: MYSQL_USER
+
+          volumeMounts:
+            - name: db-password
+              mountPath: /run/secrets/db-password
+              subPath: db-password
+              readOnly: true
+
+      volumes:
+        - name: db-password
+          secret:
+            secretName: db-secret
+            items:
+              - key: MYSQL_ROOT_PASSWORD
+                path: db-password
