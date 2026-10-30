@@ -1,0 +1,83 @@
+{{- range $name, $app := dict "frontend" .Values.frontend "backend" .Values.backend "database" .Values.database }}
+{{- if $app.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $app.name }}
+  labels:
+    app: {{ $app.name }}
+  {{- if eq $name "database" }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  replicas: {{ $app.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ $app.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $app.name }}
+    spec:
+      containers:
+        - name: {{ $app.name }}
+          image: "{{ $app.image.repository }}:{{ $app.image.tag }}"
+          imagePullPolicy: {{ $app.image.pullPolicy }}
+          ports:
+            - containerPort: {{ $app.service.targetPort }}
+
+          {{- if eq $name "backend" }}
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $app.configMapName }}
+                  key: DB_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ $app.configMapName }}
+                  key: DB_PORT
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $app.secretName }}
+                  key: MYSQL_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $app.secretName }}
+                  key: MYSQL_PASSWORD
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $app.secretName }}
+                  key: MYSQL_DATABASE
+
+          {{- else if eq $name "database" }}
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $app.secretName }}
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $app.secretName }}
+                  key: MYSQL_DATABASE
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $app.secretName }}
+                  key: MYSQL_USER
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $app.secretName }}
+                  key: MYSQL_PASSWORD
+          {{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,74 @@
+frontend:
+  enabled: true
+  name: frontend
+  replicaCount: 1
+  image:
+    repository: "achalpadol/employee-frontend-dev"
+    tag: "2d39f1e1fee98a3e967a4ee7e9d93541af6f24b7"
+    pullPolicy: IfNotPresent
+  service:
+    enabled: true
+    name: frontend
+    type: ClusterIP
+    port: 80
+    targetPort: 80
+
+backend:
+  enabled: true
+  name: backend
+  replicaCount: 1
+  image:
+    repository: "achalpadol/employee-backend-dev"
+    tag: "4a1810eda28124bb611705b2408117f15a85b202"
+    pullPolicy: IfNotPresent
+  configMapName: employee-cm
+  secretName: mysql-secret
+  service:
+    enabled: true
+    name: backend
+    type: ClusterIP
+    port: 5000
+    targetPort: 5000
+
+database:
+  enabled: true
+  name: database
+  replicaCount: 1
+  image:
+    repository: "mysql"
+    tag: "8.0"
+    pullPolicy: IfNotPresent
+  secretName: mysql-secret
+  service:
+    enabled: true
+    name: database
+    type: ClusterIP
+    port: 3306
+    targetPort: 3306
+  persistence:
+    enabled: true
+    size: 10Gi
+
+configMap:
+  enabled: true
+  name: employee-cm
+  data:
+    DB_HOST: database
+    DB_PORT: "3306"
+
+secret:
+  enabled: true
+  name: mysql-secret
+  stringData:
+    MYSQL_ROOT_PASSWORD: "rootpassword"
+    MYSQL_DATABASE: employee_db
+    MYSQL_USER: employee
+    MYSQL_PASSWORD: "employee123"
+
+ingress:
+  enabled: true
+  name: employee-management-ingress
+  className: alb
+  scheme: internet-facing
+  targetType: ip
+  host: employee.dev.local

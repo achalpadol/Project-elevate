@@ -1,0 +1,9 @@
+Your application chart has been installed.
+
+Check the application resources with:
+
+  kubectl get deployments,services,pods -n {{ .Release.Namespace }}
+
+Check the Helm release with:
+
+  helm status {{ .Release.Name }} -n {{ .Release.Namespace }}

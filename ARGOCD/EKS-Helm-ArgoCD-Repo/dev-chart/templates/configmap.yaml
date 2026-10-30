@@ -1,0 +1,10 @@
+
+{{- if .Values.backend.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.configMap.name }}
+data:
+  DB_HOST: "database"
+  DB_PORT: {{ .Values.configMap.data.DB_PORT | quote }}
+{{- end }}

@@ -1,0 +1,175 @@
+
+pipeline {
+    agent any
+    parameters {
+        choice(
+            name: 'Environment',
+            choices: ['dev', 'qa', 'uat', 'prod'],
+            description: 'Select the environment'
+        )
+        choice(
+            name: 'Terraform_Action',
+            choices: ['init', 'plan', 'apply', 'destroy'],
+            description: 'Select the Terraform action'
+        )
+        booleanParam(
+            name: 'Auto_Approve',
+            defaultValue: false,
+            description: 'Automatically approve Terraform apply/destroy'
+        )
+    }
+    environment {
+        AWS_REGION         = 'ap-south-1'
+        AWS_DEFAULT_REGION = 'ap-south-1'
+    }
+    stages {
+        stage('Terraform Init') {
+            steps {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: 'aws']
+                ]) {
+                    sh """
+                        echo "========================================"
+                        echo "Terraform Init"
+                        echo "Environment: ${params.Environment}"
+                        echo "========================================"
+
+                        aws sts get-caller-identity
+
+                        terraform init -reconfigure -backend-config="backend_conf/backend-${params.Environment}.conf"
+                    """
+                }
+            }
+        }
+        stage('Terraform Validate') {
+            when {
+                expression {
+                    params.Terraform_Action == 'plan' ||
+                    params.Terraform_Action == 'apply'
+                }
+            }
+            steps {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: 'aws']
+                ]) {
+                    sh """
+                        echo "========================================"
+                        echo "Terraform Validate"
+                        echo "Environment: ${params.Environment}"
+                        echo "========================================"
+
+                        terraform validate
+                    """
+                }
+            }
+        }
+        stage('Terraform Plan') {
+            when {
+                expression {
+                    params.Terraform_Action == 'plan'
+                }
+            }
+            steps {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: 'aws']
+                ]) {
+                    sh """
+                        echo "========================================"
+                        echo "Terraform Plan"
+                        echo "Environment: ${params.Environment}"
+                        echo "========================================"
+
+                        terraform plan -var-file="environments/${params.Environment}.tfvars"
+                    """
+                }
+            }
+        }
+        stage('Terraform Apply') {
+            when {
+                expression {
+                    params.Terraform_Action == 'apply'
+                }
+            }
+            steps {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: 'aws']
+                ]) {
+                    script {
+
+                        if (params.Auto_Approve) {
+
+                            sh """
+                                echo "========================================"
+                                echo "Terraform Apply - Auto Approved"
+                                echo "Environment: ${params.Environment}"
+                                echo "========================================"
+
+                                terraform apply \
+                                    -var-file="environments/${params.Environment}.tfvars" \
+                                    -auto-approve
+                            """
+
+                        } else {
+
+                            echo "Terraform Apply requires manual approval."
+
+                            input(
+                                message: "Do you want to apply Terraform for ${params.Environment}?",
+                                ok: "Approve and Apply"
+                            )
+
+                            sh """
+                                echo "========================================"
+                                echo "Terraform Apply - Manually Approved"
+                                echo "Environment: ${params.Environment}"
+                                echo "========================================"
+
+                                terraform apply \
+                                    -var-file="environments/${params.Environment}.tfvars" \
+                                    -auto-approve
+                            """
+                        }
+                    }
+                }
+            }
+        }
+        stage('Terraform Destroy') {
+            when {
+                expression {
+                    params.Terraform_Action == 'destroy'
+                }
+            }
+            steps {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: 'aws']
+                ]) {
+                    sh """
+                        echo "========================================"
+                        echo "Terraform Destroy"
+                        echo "Environment: ${params.Environment}"
+                        echo "========================================"
+
+                        terraform destroy -var-file="environments/${params.Environment}.tfvars" \
+                            -auto-approve
+                    """
+                }
+            }
+        }
+    }
+    post {
+        success {
+            echo "Terraform ${params.Terraform_Action} completed successfully for ${params.Environment}"
+        }
+        failure {
+            echo "Terraform ${params.Terraform_Action} failed for ${params.Environment}"
+        }
+        always {
+            cleanWs()
+        }
+    }
+}

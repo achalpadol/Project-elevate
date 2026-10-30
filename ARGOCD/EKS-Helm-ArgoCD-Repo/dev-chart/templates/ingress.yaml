@@ -1,0 +1,35 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Values.ingress.name}}
+  annotations:
+    alb.ingress.kubernetes.io/scheme: {{ .Values.ingress.scheme }}
+    alb.ingress.kubernetes.io/target-type: {{ .Values.ingress.targetType }}
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+spec:
+  ingressClassName: {{ .Values.ingress.className}}
+
+  rules:
+  - host: {{ .Values.ingress.host}}
+
+    http:
+      paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+             name: {{ .Values.frontend.name }}
+             port:
+              number: {{ .Values.frontend.service.port }}
+
+        - path: /api
+          pathType: Prefix
+          backend:
+            service:
+              name: {{ .Values.backend.name }}
+              port:
+                number: {{ .Values.backend.service.port }}
+                
+{{- end }}
+

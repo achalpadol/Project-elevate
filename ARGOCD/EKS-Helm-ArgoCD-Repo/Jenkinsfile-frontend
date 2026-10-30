@@ -1,0 +1,427 @@
+
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+    }
+
+    environment {
+        // Docker Hub image repositories
+        FRONTEND_IMAGE_DEV  = 'achalpadol/helm-frontend-dev'
+        FRONTEND_IMAGE_QA   = 'achalpadol/helm-frontend-qa'
+        FRONTEND_IMAGE_UAT  = 'achalpadol/helm-frontend-uat'
+        FRONTEND_IMAGE_PROD = 'achalpadol/helm-frontend-prod'
+
+        // Jenkins credential IDs
+        DEV_DH_CREDENTIALS  = 'dockerhub-credentials'
+        QA_DH_CREDENTIALS   = 'dockerhub-credentials'
+        UAT_DH_CREDENTIALS  = 'dockerhub-credentials'
+        PROD_DH_CREDENTIALS = 'dockerhub-credentials'
+        GIT_CREDENTIALS     = 'github-git-credentials'
+
+        REGISTRY_URL = 'https://registry.hub.docker.com'
+
+        // Frontend build configuration
+        BUILD_CONTEXT = './frontend'
+        FRONTEND_DOCKERFILE = './frontend/Dockerfile'
+
+        // Helm / GitOps configuration
+        GITOPS_BRANCH = 'main'
+        HELM_CHART_PATH = 'dev-chart'
+    }
+
+    parameters {
+        choice(
+            name: 'Environment',
+            choices: ['dev', 'qa', 'uat', 'prod'],
+            description: 'Select the target environment'
+        )
+
+        string(
+            name: 'IMAGE_TAG',
+            defaultValue: '',
+            description: 'Full 40-character DEV image commit SHA required for QA/UAT/PROD'
+        )
+
+        choice(
+            name: 'REGISTER_ARGOCD_APPLICATION',
+            choices: ['no', 'yes'],
+            description: 'Register the Argo CD Application? Select yes for first-time setup.'
+        )
+    }
+
+    stages {
+
+        // DEV: BUILD AND PUSH IMAGE
+        stage('DEV - Build and Push Frontend Image') {
+            when {
+                expression {
+                    params.Environment == 'dev'
+                }
+            }
+
+            steps {
+                script {
+                    env.IMAGE_TAG = sh(
+                        script: 'git rev-parse HEAD',
+                        returnStdout: true
+                    ).trim()
+
+                    buildAndPushImage(
+                        env.FRONTEND_IMAGE_DEV,
+                        env.DEV_DH_CREDENTIALS,
+                        env.BUILD_CONTEXT,
+                        env.IMAGE_TAG
+                    )
+
+                    echo "DEV frontend image published: ${env.FRONTEND_IMAGE_DEV}:${env.IMAGE_TAG}"
+                }
+            }
+        }
+
+        // QA: PROMOTE DEV IMAGE
+        stage('QA - Promote DEV Image') {
+            when {
+                expression {
+                    params.Environment == 'qa'
+                }
+            }
+
+            steps {
+                script {
+                    validateImageTag()
+
+                    promoteImage(
+                        env.FRONTEND_IMAGE_DEV,
+                        env.FRONTEND_IMAGE_QA,
+                        env.DEV_DH_CREDENTIALS,
+                        env.QA_DH_CREDENTIALS,
+                        params.IMAGE_TAG
+                    )
+
+                    env.IMAGE_TAG = params.IMAGE_TAG
+                }
+            }
+        }
+
+        // UAT: PROMOTE QA IMAGE
+        stage('UAT - Promote QA Image') {
+            when {
+                expression {
+                    params.Environment == 'uat'
+                }
+            }
+
+            steps {
+                script {
+                    validateImageTag()
+
+                    promoteImage(
+                        env.FRONTEND_IMAGE_QA,
+                        env.FRONTEND_IMAGE_UAT,
+                        env.QA_DH_CREDENTIALS,
+                        env.UAT_DH_CREDENTIALS,
+                        params.IMAGE_TAG
+                    )
+
+                    env.IMAGE_TAG = params.IMAGE_TAG
+                }
+            }
+        }
+
+        // PROD APPROVAL
+        stage('Production Approval') {
+            when {
+                expression {
+                    params.Environment == 'prod'
+                }
+            }
+
+            steps {
+                script {
+                    validateImageTag()
+                }
+
+                input(
+                    message: "Promote frontend image ${params.IMAGE_TAG} from UAT to PROD?",
+                    ok: 'Approve Production Promotion'
+                )
+            }
+        }
+
+        // PROD: PROMOTE UAT IMAGE
+        stage('PROD - Promote UAT Image') {
+            when {
+                expression {
+                    params.Environment == 'prod'
+                }
+            }
+
+            steps {
+                script {
+                    promoteImage(
+                        env.FRONTEND_IMAGE_UAT,
+                        env.FRONTEND_IMAGE_PROD,
+                        env.UAT_DH_CREDENTIALS,
+                        env.PROD_DH_CREDENTIALS,
+                        params.IMAGE_TAG
+                    )
+
+                    env.IMAGE_TAG = params.IMAGE_TAG
+                }
+            }
+        }
+
+        // UPDATE HELM VALUES
+        stage('Update Helm Values') {
+            steps {
+                script {
+                    def valuesFile = getValuesFile(params.Environment)
+                    def targetImage = getTargetImage(params.Environment)
+
+                    withEnv([
+                        "IMAGE_TAG=${env.IMAGE_TAG}",
+                        "IMAGE_REPOSITORY=${targetImage}",
+                        "VALUES_FILE=${valuesFile}"
+                    ]) {
+                        sh '''
+                            set -eu
+
+                            test -f "$VALUES_FILE"
+
+                            yq -i '
+                                .frontend.image.repository = strenv(IMAGE_REPOSITORY) |
+                                .frontend.image.tag = strenv(IMAGE_TAG)
+                            ' "$VALUES_FILE"
+                        '''
+                    }
+                }
+            }
+        }
+
+        // COMMIT AND PUSH HELM VALUES
+        stage('Commit and Push Helm Values') {
+            steps {
+                script {
+                    def valuesFile = getValuesFile(params.Environment)
+
+                    withEnv([
+                        "VALUES_FILE=${valuesFile}",
+                        "TARGET_ENV=${params.Environment}",
+                        "IMAGE_TAG=${env.IMAGE_TAG}"
+                    ]) {
+                        sh '''
+                            set -eu
+
+                            git config user.name "Jenkins CI"
+                            git config user.email "jenkins@example.invalid"
+
+                            git add "$VALUES_FILE"
+
+                            if ! git diff --cached --quiet; then
+                                git commit -m \
+                                  "Update frontend ${TARGET_ENV} image to ${IMAGE_TAG}"
+                            else
+                                echo "No Helm values changes detected."
+                            fi
+                        '''
+                    }
+
+                    withCredentials([
+                        gitUsernamePassword(
+                            credentialsId: env.GIT_CREDENTIALS,
+                            gitToolName: 'Default'
+                        )
+                    ]) {
+                        sh "git push origin HEAD:${env.GITOPS_BRANCH}"
+                    }
+                }
+            }
+        }
+
+        // OPTIONAL: REGISTER ARGO CD APPLICATION
+        stage('Register Argo CD Application') {
+            when {
+                expression {
+                    params.REGISTER_ARGOCD_APPLICATION == 'yes'
+                }
+            }
+
+            steps {
+                script {
+                    def cluster = getEKSCluster(params.Environment)
+                    def manifest = getArgoCDManifest(params.Environment)
+
+                    withCredentials([
+                        [
+                            $class: 'AmazonWebServicesCredentialsBinding',
+                            credentialsId: 'aws'
+                        ]
+                    ]) {
+                        sh """
+                            set -eu
+
+                            aws eks update-kubeconfig \
+                              --name '${cluster}' \
+                              --region ap-south-1
+
+                            test -f '${manifest}'
+
+                            kubectl apply -f '${manifest}'
+                        """
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo """
+            Frontend pipeline completed successfully.
+
+            Environment: ${params.Environment}
+            Image tag: ${env.IMAGE_TAG}
+
+            Helm values have been updated in Git.
+            Argo CD will reconcile the deployment according to
+            the Application's synchronization configuration.
+            """
+        }
+
+        failure {
+            echo 'Pipeline failed. Check the Jenkins console output.'
+        }
+
+        always {
+            deleteDir()
+        }
+    }
+}
+
+
+// FUNCTION 1: BUILD AND PUSH IMAGE
+def buildAndPushImage(
+    String imageName,
+    String credentialsId,
+    String buildContext,
+    String imageTag
+) {
+    def image = docker.build(
+        "${imageName}:${imageTag}",
+        "-f ${env.FRONTEND_DOCKERFILE} ${buildContext}"
+    )
+
+    docker.withRegistry(
+        env.REGISTRY_URL,
+        credentialsId
+    ) {
+        image.push()
+    }
+}
+
+
+// FUNCTION 2: PROMOTE IMAGE BETWEEN ENVIRONMENTS
+def promoteImage(
+    String sourceImage,
+    String targetImage,
+    String sourceCredentials,
+    String targetCredentials,
+    String imageTag
+) {
+    if (!imageTag?.trim()) {
+        error('IMAGE_TAG is required for image promotion.')
+    }
+
+    def sourceURI = "${sourceImage}:${imageTag}"
+    def targetURI = "${targetImage}:${imageTag}"
+
+    echo "Source image: ${sourceURI}"
+    echo "Target image: ${targetURI}"
+
+    docker.withRegistry(
+        env.REGISTRY_URL,
+        sourceCredentials
+    ) {
+        docker.image(sourceURI).pull()
+    }
+
+    sh """
+        set -eu
+        docker tag '${sourceURI}' '${targetURI}'
+    """
+
+    docker.withRegistry(
+        env.REGISTRY_URL,
+        targetCredentials
+    ) {
+        docker.image(targetURI).push()
+    }
+
+    echo 'Frontend image promotion completed successfully.'
+}
+
+
+// FUNCTION 3: VALIDATE IMAGE TAG
+def validateImageTag() {
+    if (!(params.IMAGE_TAG ==~ /[a-fA-F0-9]{40}/)) {
+        error(
+            'QA/UAT/PROD require the full 40-character Git commit SHA in IMAGE_TAG.'
+        )
+    }
+}
+
+
+// FUNCTION 4: SELECT TARGET IMAGE
+def getTargetImage(String environment) {
+    def images = [
+        dev : env.FRONTEND_IMAGE_DEV,
+        qa  : env.FRONTEND_IMAGE_QA,
+        uat : env.FRONTEND_IMAGE_UAT,
+        prod: env.FRONTEND_IMAGE_PROD
+    ]
+
+    return images[environment]
+}
+
+
+// FUNCTION 5: SELECT HELM VALUES FILE
+def getValuesFile(String environment) {
+    def files = [
+        dev : "${env.HELM_CHART_PATH}/values-dev.yaml",
+        qa  : "${env.HELM_CHART_PATH}/values-qa.yaml",
+        uat : "${env.HELM_CHART_PATH}/values-uat.yaml",
+        prod: "${env.HELM_CHART_PATH}/values-prod.yaml"
+    ]
+
+    return files[environment]
+}
+
+
+// FUNCTION 6: SELECT EKS CLUSTER
+def getEKSCluster(String environment) {
+    def clusters = [
+        dev : 'dev-eks-cluster',
+        qa  : 'qa-eks-cluster',
+        uat : 'uat-eks-cluster',
+        prod: 'prod-eks-cluster'
+    ]
+
+    return clusters[environment]
+}
+
+
+// FUNCTION 7: SELECT ARGO CD APPLICATION MANIFEST
+def getArgoCDManifest(String environment) {
+    def manifests = [
+        dev : 'argocd/dev/argocd-frontend-dev.yaml',
+        qa  : 'argocd/qa/argocd-frontend-qa.yaml',
+        uat : 'argocd/uat/argocd-frontend-uat.yaml',
+        prod: 'argocd/prod/argocd-frontend-prod.yaml'
+    ]
+
+    return manifests[environment]
+}
+

@@ -1,0 +1,19 @@
+{{- range $name, $app := dict "frontend" .Values.frontend "backend" .Values.backend "database" .Values.database }}
+{{- if $app.service.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $app.service.name }}
+  labels:
+    app: {{ $app.name }}
+spec:
+  type: {{ $app.service.type }}
+  selector:
+    app: {{ $app.name }}
+  ports:
+    - port: {{ $app.service.port }}
+      targetPort: {{ $app.service.targetPort }}
+      protocol: TCP
+{{- end }}
+{{- end }}
